@@ -11,7 +11,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
-const PORT = 3000;
+const PORT = process.env.PORT;
 
 app.use(express.static("public"));
 app.use(express.json());
