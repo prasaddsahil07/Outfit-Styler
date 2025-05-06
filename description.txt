@@ -1,0 +1,53 @@
+Tools and Libraries Used:
+
+Frontend:
+    HTML, CSS (custom styling)
+    JavaScript (vanilla)
+
+Backend:
+    Node.js with Express.js
+    multer for handling file uploads
+    dotenv for managing environment variables
+    fs and path for file system operations
+    @google/genai (Google Generative AI SDK) for image generation
+
+
+Ensuring Outfit Consistency:
+    The uploaded image is passed as base64 to Gemini for each occasion-specific generation.
+    Each generation request uses the same input image and a controlled, structured prompt that:
+    Emphasizes preserving the original outfit's structure, design, and appearance
+    Instructs Gemini to overlay the same outfit on a model while changing only the styling context (Office, Party, Vacation)
+    No additional modifications or noise are introduced to the base image between generations, ensuring consistency.
+
+
+Sample Propmpt:
+    Create a high-quality, fashion-forward editorial image in the style of Pinterest photography. Stylize the uploaded outfit specifically for a [STYLE] occasion (Office, Party, or Vacation), while strictly retaining the original outfit's structure, design, and format. Ensure consistency across all three outputs, with a realistic and polished fashion aesthetic that aligns with modern editorial standards. A model should be wearing the outfit in each version.
+
+    Where [STYLE] is dynamically replaced with Office, Party, or Vacation.
+
+
+Automation Code Summary:
+    const styles = ["Office", "Party", "Vacation"];
+    for (const style of styles) {
+        const prompt = `...${style}...`;
+        const contents = [
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Image } },
+        ];
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-exp-image-generation",
+            contents,
+            config: { responseModalities: [Modality.TEXT, Modality.IMAGE] },
+        });
+
+        const imagePart = response.candidates[0].content.parts.find(p => p.inlineData);
+        if (imagePart) {
+            const buffer = Buffer.from(imagePart.inlineData.data, "base64");
+            const filename = `generated/${style.toLowerCase()}-${Date.now()}.png`;
+            fs.writeFileSync(filename, buffer);
+            results.push({ style, base64: imagePart.inlineData.data });
+        }
+    }
+
+    The generated images are stored in the "generated' folder.

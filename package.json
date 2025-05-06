@@ -1,0 +1,24 @@
+{
+  "name": "Outfit-Styler",
+  "version": "1.0.0",
+  "description": "Fashion Styler Backend - Node.js + Express",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "Sahil Prasad",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^0.12.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "multer": "^1.4.5-lts.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
