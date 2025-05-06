@@ -4,10 +4,13 @@ import multer from "multer";
 import fs from "fs";
 import dotenv from "dotenv";
 import path from "path";
+import job from "./cron.js";
 
 dotenv.config();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+job.start();
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -25,7 +28,9 @@ app.post("/generate-image", upload.single("image"), async (req, res) => {
         const results = [];
 
         for (const style of styles) {
-            const prompt = `Create a high-quality, fashion-forward editorial image in the style of Pinterest photography. Stylize the uploaded outfit specifically for a ${style} occasion (Office, Party, or Vacation), showing it realistically worn by a consistent, model. The model should be the same across all three styles to maintain neutrality. Strictly retain the original outfit's structure, color, and format in every version. Ensure all outputs reflect a cohesive, realistic, and polished editorial aesthetic.`;
+            const prompt = `Generate a high-quality editorial image in Pinterest fashion style. Take the uploaded outfit and apply realistic styling suitable for a ${style} occasion (Office, Party, or Vacation), BUT DO NOT alter the outfit’s shape, structure, length, width, height, fabric, color, or design in any way. 
+            The exact outfit must be preserved — no shortening, lengthening, or color variation is allowed. The model wearing the outfit should remain consistent across all outputs, and the garment must appear exactly the same in all styles, only changing the background and accessories minimally to reflect the occasion. Maintain full photorealism and editorial polish.`;
+
 
             const contents = [
                 { text: prompt },
