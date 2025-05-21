@@ -30,6 +30,11 @@ const eventSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    generatedImages: [
+        {
+            type: String, // can be base64 string or a public URL
+        }
+    ],
     createdAt: {
         type: Date,
         default: Date.now,

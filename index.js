@@ -18,7 +18,7 @@ dotenv.config();
 
 await connectDB();
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+export const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 job.start();
 
@@ -28,14 +28,15 @@ const PORT = process.env.PORT;
 
 app.use(express.json());
 
+app.use("/static", express.static("static"));
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(express.static("public"));
 
-
-app.use("/api/v1/events", eventRoute);
-
+app.use("/api/events", eventRoute);
 
 // app.post('/api/process-garment', upload.single('image'), async (req, res) => {
 //     const category = req.body.category;
@@ -431,143 +432,137 @@ app.post("/generate-image-from-wardrobe", async (req, res) => {
 });
 
 app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) => {
+    let tempFilePath = null;
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No image file uploaded' });
         }
 
-        // const filePath = req.file.path;
-        const base64Image = req.file.buffer.toString("base64"); // Save file temporarily to disk
-        const tempFilename = `${uuidv4()}.jpg`; // or .png
-        const tempFilePath = path.join("temp_uploads", tempFilename);
+        // Create temp directory if not exists
         fs.mkdirSync("temp_uploads", { recursive: true });
-        fs.writeFileSync(tempFilePath, req.file.buffer);
+        tempFilePath = path.join("temp_uploads", `${uuidv4()}.jpg`);
+        await fs.promises.writeFile(tempFilePath, req.file.buffer);
 
-        // Extract metadata using Gemini
-        const metadata = await extractClothingMetadata(base64Image, req);
+        // Convert to base64 and extract metadata
+        const base64Image = req.file.buffer.toString('base64');
+        const metadata = await extractClothingMetadata(base64Image); // Pass only base64 string
 
-        // storing into the apt folder
+        // Validate metadata
+        if (!metadata || typeof metadata !== 'object') {
+            throw new Error('Invalid metadata format received');
+        }
+
+        // Store organized image
         const savedLocations = await organizeClothingImage(tempFilePath, metadata);
-
-        // free up the disk
-        fs.unlinkSync(tempFilePath);
 
         res.status(200).json({
             success: true,
-            message: 'Clothing item analyzed and saved successfully',
+            message: 'Clothing item processed successfully',
             metadata: metadata,
             locations: savedLocations
         });
     } catch (error) {
         console.error('Error processing clothing image:', error);
         res.status(500).json({
-            error: 'Failed to process clothing image',
+            success: false,
+            error: 'Image processing failed',
             details: error.message
         });
+    } finally {
+        // Clean up temp file
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+            try {
+                await fs.promises.unlink(tempFilePath);
+            } catch (cleanupError) {
+                console.error('Failed to clean up temp file:', cleanupError);
+            }
+        }
     }
 });
 
 // Function to extract clothing metadata using Gemini API
-async function extractClothingMetadata(base64Image, req) {
+async function extractClothingMetadata(base64Image, mimetype) {
     try {
         const prompt = `
         You are a professional fashion analyst. Analyze the uploaded clothing item image with attention to detail and return **only the most accurate metadata** in JSON format.
 
-        Your task is to identify the following eight attributes as accurately as possible:
-
-        1. **category** - "topwear" | "bottomwear" | "both"
-        2. **itemCategories** – Array of specific types of clothing (e.g., ["T-shirt", "Jeans"])
-        3. **fabrics** – 
-        - If category is "topwear" or "bottomwear", return an array (e.g., ["Cotton", "Denim"])
-        - If category is "both", return an object:
-            {
-            "topwear": ["Cotton"],
-            "bottomwear": ["Denim"]
-            }
-        4. **occasions** – 
-        - If category is "topwear" or "bottomwear", return an array (e.g., ["Work", "Casual"])
-        - If category is "both", return an object:
-            {
-            "topwear": ["Work"],
-            "bottomwear": ["Party", "Casual"]
-            }
-        5. **seasons** – An array of suitable seasons (e.g., ["Summer", "Spring"])
-        6. **colors** – 
-        - If category is "topwear" or "bottomwear", return an array (e.g., ["Blue", "White"])
-        - If category is "both", return an object:
-            {
-            "topwear": ["White"],
-            "bottomwear": ["Blue"]
-            }
-        7. **pattern** – The most identifiable pattern (e.g., "Solid", "Striped", "Floral", "Checkered")
-        8. **style** – A short, 1-line description of the overall fashion style (e.g., "Minimalist streetwear with modern appeal")
-
-        **Important:**
-        - **category** must be exactly "topwear", "bottomwear", or "both"
-        - Output a valid, clean, parseable **JSON object** — no explanation, no markdown
-        - Do not leave any field null or missing. If unsure, provide the most reasonable guess.
-        - Always return in this exact format:
-
+        Required JSON structure:
         {
-        "category": "",
-        "itemCategories": [],
-        "fabrics": [], or { "topwear": [], "bottomwear": [] },
-        "occasions": [], or { "topwear": [], "bottomwear": [] },
-        "seasons": [],
-        "colors": [], or { "topwear": [], "bottomwear": [] },
-        "pattern": "",
-        "style": ""
+            "category": "topwear" | "bottomwear" | "both",
+            "itemCategories": ["specific", "types"],
+            "fabrics": [] | { "topwear": [], "bottomwear": [] },
+            "occasions": [] | { "topwear": [], "bottomwear": [] },
+            "seasons": ["season1", "season2"],
+            "colors": [] | { "topwear": [], "bottomwear": [] },
+            "pattern": "pattern_name",
+            "style": "style_description"
         }
-        `;
 
-        const contents = [
-            { text: prompt },
-            {
-                inlineData: {
-                    mimeType: req.file.mimetype,
-                    data: base64Image,
-                },
-            },
-        ];
+        Rules:
+        1. ALL fields must be populated - no null/undefined
+        2. Return ONLY the JSON object - no markdown, no explanations
+        3. For "both" category, split properties by garment part
+        4. If uncertain, make educated guesses
+        `;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash-exp",
-            contents,
-            config: {
-                responseModalities: [Modality.TEXT, Modality.IMAGE],
-            },
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { 
+                        inlineData: { 
+                            mimeType: mimetype || "image/jpeg",
+                            data: base64Image 
+                        }
+                    }
+                ]
+            }],
+            generationConfig: {
+                response_mime_type: "application/json"
+            }
         });
 
-        const parts = response.candidates[0].content.parts;
-        const textPart = parts.find((p) => p.text);         // textPart is an object
+        // Extract and clean JSON response
+        const textResponse = response.candidates[0]?.content?.parts?.[0]?.text || '';
+        const jsonString = textResponse
+            .replace(/^```json|```$/g, '')
+            .replace(/^```|```$/g, '')
+            .trim();
 
-        // console.log(textPart.text);
-
-        let jsonString = textPart.text.trim();
-        jsonString = jsonString.replace(/```json|```/g, '').trim();
+        if (!jsonString) throw new Error('Empty response from Gemini');
 
         const parsedMetadata = JSON.parse(jsonString);
 
-        if (!parsedMetadata) {
-            throw new Error('Failed to parse metadata JSON from Gemini response');
+        // Validate required fields
+        const requiredFields = ['category', 'itemCategories', 'fabrics', 'occasions', 'seasons', 'colors', 'pattern', 'style'];
+        for (const field of requiredFields) {
+            if (!parsedMetadata[field]) {
+                throw new Error(`Missing required field: ${field}`);
+            }
         }
 
         return parsedMetadata;
 
     } catch (error) {
-        console.error('Error extracting metadata:', error);
-        return {
-            category: 'Uncategorized',
-            itemCategory: 'Uncategorized',
-            fabric: 'Unknown',
-            occasions: ['Casual'],
-            seasons: ['All Seasons'],
-            colors: ['Unknown'],
-            pattern: 'Unknown',
-            style: 'Unknown',
-            dateAdded: new Date().toISOString()
-        };
+        console.error('Metadata extraction error:', error);
+        return getFallbackMetadata();
     }
+}
+
+// Default metadata for error cases
+function getFallbackMetadata() {
+    return {
+        category: 'Uncategorized',
+        itemCategories: ['Uncategorized'],
+        fabrics: ['Unknown'],
+        occasions: ['Casual'],
+        seasons: ['All Seasons'],
+        colors: ['Unknown'],
+        pattern: 'Unknown',
+        style: 'Unknown',
+        dateAdded: new Date().toISOString()
+    };
 }
 
 // Function to organize the clothing image into topwear and/or bottomwear folders
