@@ -1,12 +1,22 @@
 import express from "express";
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, createUserContent } from "@google/genai";
 import multer from "multer";
-import fs from "fs";
 import dotenv from "dotenv";
-import path from "path";
 import job from "./cron.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
+import { connectDB } from "./db/connectDB.js";
+import { PythonShell } from "python-shell";
+
+
+import eventRoute from "./routes/events.routes.js";
+
 
 dotenv.config();
+
+await connectDB();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -16,64 +26,316 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 const PORT = process.env.PORT;
 
-app.use(express.static("public"));
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static("public"));
+
+
+app.use("/api/v1/events", eventRoute);
+
+
+// app.post('/api/process-garment', upload.single('image'), async (req, res) => {
+//     const category = req.body.category;
+
+//     if (!req.file || !category) {
+//         return res.status(400).json({ error: "Image and category are required" });
+//     }
+
+//     const options = {
+//         mode: 'json',
+//         pythonPath: 'python',
+//         pythonOptions: ['-u'],
+//         scriptPath: __dirname
+//     };
+
+//     const pyshell = new PythonShell('clip_script.py', options);
+
+//     pyshell.on('error', (err) => {
+//         console.error('PythonShell Error:', err);
+//         return res.status(500).json({ error: "Python script failed" });
+//     });
+
+
+//     const payload = {
+//         image: req.file.buffer.toString('base64'),
+//         category
+//     };
+
+//     let resultData = '';
+
+//     pyshell.on('message', (message) => {
+//         resultData += JSON.stringify(message);
+//     });
+
+//     pyshell.send(payload);
+
+//     pyshell.end((err) => {
+//         if (err) return res.status(500).json({ error: err.message });
+
+//         try {
+//             const parsed = JSON.parse(resultData);
+//             if (parsed.error) {
+//                 return res.status(500).json({ error: parsed.error });
+//             }
+//             res.json(parsed);
+//         } catch (parseErr) {
+//             res.status(500).json({ error: "Invalid response from Python script" });
+//         }
+//     });
+// });
+
+// IP-Adapter processing endpoint
+// app.post('/api/style-outfits', upload.single('image'), async (req, res) => {
+//     if (!req.file) {
+//         return res.status(400).json({ error: "Image is required" });
+//     }
+
+//     const options = {
+//         mode: 'json',
+//         pythonPath: 'python',
+//         scriptPath: path.join(__dirname, 'python_scripts'),
+//         pythonOptions: ['-u'],
+//         args: []
+//     };
+
+//     try {
+//         const results = await new Promise((resolve, reject) => {
+//             const pyshell = new PythonShell('ip_adapter_processor.py', options);
+
+//             let output = [];
+//             pyshell.on('message', (message) => {
+//                 output.push(message);
+//             });
+
+//             pyshell.send(req.file.buffer.toString('base64'));
+
+
+//             pyshell.end((err) => {
+//                 if (err) reject(err);
+//                 resolve(output);
+//             });
+//         });
+
+//         res.json({
+//             original_image: `data:image/png;base64,${req.file.buffer.toString('base64')}`,
+//             styled_outfits: results
+//         });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// });
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "landing.html"));
+});
+
+app.get("/api/closet/:weather", (req, res) => {
+    const weather = req.params.weather.toLowerCase();
+    const dirPath = path.join(__dirname, "public", "closet", `${weather}_collection`);
+
+    try {
+        const files = fs.readdirSync(dirPath);
+        const imageFiles = files.filter(file => file.endsWith(".jpg"));
+        res.json(imageFiles);
+    } catch (err) {
+        console.error("Directory read error:", err);
+        res.status(500).json({ error: "Failed to read directory" });
+    }
+});
+
+app.get("/get-my-wardrobe", async (req, res) => {
+    try {
+        const folders = ['topwear', 'bottomwear'];
+        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
+        const occasionsSet = new Set();
+        const fabricSet = new Set();
+
+        folders.forEach(folder => {
+            const folderPath = path.join(baseDir, folder);
+            const files = fs.readdirSync(folderPath);
+
+            files.forEach(file => {
+                if (file.endsWith('.json')) {
+                    const metadata = JSON.parse(fs.readFileSync(path.join(folderPath, file), 'utf-8'));
+
+                    // console.log("Parsed metadata:", metadata);
+
+                    const occasions = metadata.occasions;
+
+                    if (Array.isArray(occasions)) {
+                        occasions.forEach(o => occasionsSet.add(o.toLowerCase()));
+                    } else if (typeof occasions === 'object' && occasions !== null) {
+                        Object.values(occasions).forEach(arr => {
+                            arr.forEach(o => occasionsSet.add(o.toLowerCase()));
+                        });
+                    }
+
+                    const fabrics = metadata.fabrics;
+
+                    if (Array.isArray(fabrics)) {
+                        fabrics.forEach(o => fabricSet.add(o.toLowerCase()));
+                    } else if (typeof fabrics === 'object' && fabrics !== null) {
+                        Object.values(fabrics).forEach(arr => {
+                            arr.forEach(o => fabricSet.add(o.toLowerCase()));
+                        });
+                    }
+
+                }
+            });
+
+        });
+
+        res.json({ occasions: Array.from(occasionsSet), fabrics: Array.from(fabricSet) });
+    } catch (error) {
+        // console.error("Error fetching wardrobe occasions:", error);
+        res.status(500).json({ error: "Failed to fetch wardrobe data" });
+    }
+});
+
+app.get("/filter-wardrobe", async (req, res) => {
+    try {
+        const { title, type } = req.query;
+
+        if (!title || !type) {
+            return res.status(400).json({ error: "Missing title or type in query" });
+        }
+
+        const collections = [];
+        const folders = ['topwear', 'bottomwear'];
+        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
+
+        folders.forEach(folder => {
+            const folderPath = path.join(baseDir, folder);
+            const files = fs.readdirSync(folderPath);
+
+            files.forEach(file => {
+                if (file.endsWith('.json')) {
+                    const metadataPath = path.join(folderPath, file);
+                    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+
+                    let matchFound = false;
+
+                    if (title in metadata) {
+                        const field = metadata[title];
+
+                        // Handle array directly (like ["Work", "Party"])
+                        if (Array.isArray(field)) {
+                            matchFound = field.map(f => f.toLowerCase()).includes(type.toLowerCase());
+                        }
+
+                        // Handle nested object (like for "occasions": { topwear: [...], bottomwear: [...] })
+                        else if (typeof field === 'object' && field !== null) {
+                            Object.values(field).forEach(arr => {
+                                if (Array.isArray(arr) && arr.map(f => f.toLowerCase()).includes(type.toLowerCase())) {
+                                    matchFound = true;
+                                }
+                            });
+                        }
+
+                        // Handle simple string field (e.g., pattern: "Striped")
+                        else if (typeof field === 'string') {
+                            matchFound = field.toLowerCase() === type.toLowerCase();
+                        }
+                    }
+
+                    if (matchFound) {
+                        const imageFilename = file.replace('.json', '.jpg'); // assuming JPG images
+                        const imagePath = `/uploads/wardrobe/${folder}/${imageFilename}`;
+                        collections.push(imagePath);
+                    }
+                }
+            });
+        });
+
+        res.json({ results: collections });
+    } catch (error) {
+        console.error("Error filtering wardrobe:", error);
+        res.status(500).json({ error: "Failed to filter wardrobe" });
+    }
+});
+
 
 app.post("/generate-image", upload.single("image"), async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+        const clothingType = req.body.bodyPart;
+        const occasion = req.body.occasion;
+
+        if (!req.file || !clothingType || !occasion) {
+            return res.status(400).json({ error: "Missing image or clothing type/occasion" });
+        }
 
         const base64Image = req.file.buffer.toString("base64");
-        const styles = ["Office", "Party", "Vacation"];
+
+        const prompt = `
+Approach this like a professional fashion stylist creating 3 distinct editorials based on one key garment.
+
+Generate **three visually distinct complete outfits** in a flatlay/editorial style with modern Pinterest fashion aesthetic, using the uploaded ${clothingType} as the central piece for all three looks.
+
+CRITICAL REQUIREMENTS:
+1. The uploaded ${clothingType} item MUST appear EXACTLY as provided in all three images - do not alter its color, shape, pattern, style, size, or any visual characteristics.
+2. Create three COMPLETELY DIFFERENT outfit combinations around this ${clothingType} for the "${occasion}" occasion.
+
+For each complete outfit:
+- If user uploaded topwear: Add different bottoms, shoes, and accessories for each look
+- If user uploaded bottomwear: Add different tops, shoes, and accessories for each look
+- Include appropriate accessories that complement each unique styling direction (jewelry, bags, shoes, belts, etc.)
+
+Visual presentation requirements:
+- Flatlay/editorial composition with items arranged professionally
+- Clean, neutral background with soft natural lighting
+- No human figures or mannequins
+- Photorealistic, high-quality imagery with professional styling
+- Maintain consistent size/scale of the uploaded item across all three outfits
+
+The goal is to showcase styling versatility by creating three distinct aesthetic directions using the EXACT SAME uploaded garment. Think of these as three separate magazine editorials featuring the same piece styled in completely different ways.
+`;
+
+
+        const contents = [
+            { text: prompt },
+            {
+                inlineData: {
+                    mimeType: req.file.mimetype,
+                    data: base64Image,
+                },
+            },
+        ];
+
         const results = [];
 
-        for (const style of styles) {
-            const prompt = `Generate a high-quality editorial image in Pinterest fashion style. Take the uploaded outfit and apply realistic styling suitable for a ${style} occasion (Office, Party, or Vacation), BUT DO NOT alter the outfit’s shape, structure, length, width, height, fabric, color, or design in any way. 
-            The exact outfit must be preserved — no shortening, lengthening, or color variation is allowed. The model wearing the outfit should remain consistent across all outputs, and the garment must appear exactly the same in all styles, only changing the background and accessories minimally to reflect the occasion. Maintain full photorealism and editorial polish.`;
-
-
-            const contents = [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType: req.file.mimetype,
-                        data: base64Image,
-                    },
-                },
-            ];
-
-            const outputDir = path.join("generated");
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir);
-            }
-
+        // Generate 3 variations
+        for (let i = 1; i <= 3; i++) {
             const response = await ai.models.generateContent({
-                model: "gemini-2.0-flash-exp-image-generation",
+                model: "gemini-2.0-flash-exp",
                 contents,
                 config: {
                     responseModalities: [Modality.TEXT, Modality.IMAGE],
                 },
             });
 
+            // console.log(response.candidates[0].content.parts);
+
             const parts = response.candidates[0].content.parts;
+            // const textPart = parts.find((p) => p.text);
+
             const imagePart = parts.find((p) => p.inlineData);
 
+            // console.log(textPart);
+
             if (imagePart) {
-                const base64Data = imagePart.inlineData.data;
-                const buffer = Buffer.from(base64Data, "base64");
-
-                const fileName = `generated/${style.toLowerCase()}-${Date.now()}.png`;
-                fs.writeFileSync(fileName, buffer);
-
                 results.push({
-                    style,
-                    base64: base64Data, // for frontend preview
-                    filePath: fileName  // optional: send back path
+                    style: `${occasion} #${i}`,
+                    base64: imagePart.inlineData.data,
                 });
             } else {
-                results.push({ style, error: "No image returned" });
+                results.push({
+                    style: `${occasion} #${i}`,
+                    error: "No image returned from Gemini",
+                });
             }
-
         }
 
         res.json({ results });
@@ -82,6 +344,295 @@ app.post("/generate-image", upload.single("image"), async (req, res) => {
         res.status(500).json({ error: "Image generation failed" });
     }
 });
+
+app.post("/generate-image-from-wardrobe", async (req, res) => {
+    const { bodyPart, occasion } = req.body;
+
+    if (!bodyPart || !occasion) {
+        return res.status(400).json({ error: "Missing clothing type or occasion" });
+    }
+
+    const wardrobeDir = path.join(__dirname, "wardrobe");
+
+    try {
+        // Read and take first 5 images
+        const files = fs.readdirSync(wardrobeDir)
+            .filter(file => /\.(png|jpg|jpeg)$/i.test(file))
+            .slice(0, 10);
+
+        // Convert images to base64 (without data URI prefix)
+        const base64Images = files.map(file => {
+            const filePath = path.join(wardrobeDir, file);
+            const imageBuffer = fs.readFileSync(filePath);
+            return imageBuffer.toString("base64");
+        });
+
+        // Prompt for the model — no need to embed base64 images in prompt string
+        const prompt = `Think and reason like a professional fashion stylist tasked with creating three visually appealing and occasion-appropriate outfits using the actual clothes from a client's closet.
+        You are given a collection of 10 outfit images from a user's digital wardrobe. Each image is either a top-wear or bottom-wear item. These wardrobe items must be used *as-is* — do not modify their shape, size, color, texture, or design in any way.
+
+        Your task is to carefully analyze **all the wardrobe images** and generate **three distinct, different styles and complete fashion outfits** styled for the occasion: "${occasion}". Each outfit should focus on showcasing clothing items related to the user's selected focus: "${bodyPart}" (either top-wear or bottom-wear).
+
+        For each of the 3 styles:
+        - Use **only the items present in the wardrobe**; do not invent or hallucinate garments.
+        - Select the most suitable yet different combinations based on the occasion and body part.
+        - Maintain the original look of wardrobe items without any alteration.
+        - Add realistic complementary elements (e.g., shoes, bags, subtle accessories) to complete the outfit, only if needed.
+        - Avoid human figures or mannequins completely.
+        - Present the outfits in a neutral, editorial-style layout — flatlay, still-life, or styled product shot.
+        - Ensure photorealistic quality and distinct styling direction for each look.
+        - Each image must feel fashion-forward, polished, and Pinterest-worthy.`;
+
+
+        // Format content for Gemini API
+        const contents = createUserContent([
+            { text: prompt },
+            ...base64Images.map(base64 => ({
+                inlineData: {
+                    mimeType: "image/jpeg", // or dynamically detect mimeType if needed
+                    data: base64,
+                },
+            })),
+        ]);
+
+        const results = [];
+
+        for (let i = 1; i <= 3; i++) {
+            const response = await ai.models.generateContent({
+                model: "gemini-2.0-flash-exp",
+                contents,
+                config: {
+                    responseModalities: [Modality.TEXT, Modality.IMAGE],
+                },
+            });
+            // console.log(response.text);
+            // console.log(response.candidates[0].content);
+            const parts = response.candidates[0].content.parts;
+            const imagePart = parts.find(p => p.inlineData);
+
+            if (imagePart) {
+                results.push({
+                    style: `${occasion} #${i}`,
+                    base64: imagePart.inlineData.data,
+                });
+            } else {
+                results.push({
+                    style: `${occasion} #${i}`,
+                    error: "No image returned from Gemini",
+                });
+            }
+        }
+
+        res.json({ results });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to process wardrobe images" });
+    }
+});
+
+app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image file uploaded' });
+        }
+
+        // const filePath = req.file.path;
+        const base64Image = req.file.buffer.toString("base64"); // Save file temporarily to disk
+        const tempFilename = `${uuidv4()}.jpg`; // or .png
+        const tempFilePath = path.join("temp_uploads", tempFilename);
+        fs.mkdirSync("temp_uploads", { recursive: true });
+        fs.writeFileSync(tempFilePath, req.file.buffer);
+
+        // Extract metadata using Gemini
+        const metadata = await extractClothingMetadata(base64Image, req);
+
+        // storing into the apt folder
+        const savedLocations = await organizeClothingImage(tempFilePath, metadata);
+
+        // free up the disk
+        fs.unlinkSync(tempFilePath);
+
+        res.status(200).json({
+            success: true,
+            message: 'Clothing item analyzed and saved successfully',
+            metadata: metadata,
+            locations: savedLocations
+        });
+    } catch (error) {
+        console.error('Error processing clothing image:', error);
+        res.status(500).json({
+            error: 'Failed to process clothing image',
+            details: error.message
+        });
+    }
+});
+
+// Function to extract clothing metadata using Gemini API
+async function extractClothingMetadata(base64Image, req) {
+    try {
+        const prompt = `
+        You are a professional fashion analyst. Analyze the uploaded clothing item image with attention to detail and return **only the most accurate metadata** in JSON format.
+
+        Your task is to identify the following eight attributes as accurately as possible:
+
+        1. **category** - "topwear" | "bottomwear" | "both"
+        2. **itemCategories** – Array of specific types of clothing (e.g., ["T-shirt", "Jeans"])
+        3. **fabrics** – 
+        - If category is "topwear" or "bottomwear", return an array (e.g., ["Cotton", "Denim"])
+        - If category is "both", return an object:
+            {
+            "topwear": ["Cotton"],
+            "bottomwear": ["Denim"]
+            }
+        4. **occasions** – 
+        - If category is "topwear" or "bottomwear", return an array (e.g., ["Work", "Casual"])
+        - If category is "both", return an object:
+            {
+            "topwear": ["Work"],
+            "bottomwear": ["Party", "Casual"]
+            }
+        5. **seasons** – An array of suitable seasons (e.g., ["Summer", "Spring"])
+        6. **colors** – 
+        - If category is "topwear" or "bottomwear", return an array (e.g., ["Blue", "White"])
+        - If category is "both", return an object:
+            {
+            "topwear": ["White"],
+            "bottomwear": ["Blue"]
+            }
+        7. **pattern** – The most identifiable pattern (e.g., "Solid", "Striped", "Floral", "Checkered")
+        8. **style** – A short, 1-line description of the overall fashion style (e.g., "Minimalist streetwear with modern appeal")
+
+        **Important:**
+        - **category** must be exactly "topwear", "bottomwear", or "both"
+        - Output a valid, clean, parseable **JSON object** — no explanation, no markdown
+        - Do not leave any field null or missing. If unsure, provide the most reasonable guess.
+        - Always return in this exact format:
+
+        {
+        "category": "",
+        "itemCategories": [],
+        "fabrics": [], or { "topwear": [], "bottomwear": [] },
+        "occasions": [], or { "topwear": [], "bottomwear": [] },
+        "seasons": [],
+        "colors": [], or { "topwear": [], "bottomwear": [] },
+        "pattern": "",
+        "style": ""
+        }
+        `;
+
+        const contents = [
+            { text: prompt },
+            {
+                inlineData: {
+                    mimeType: req.file.mimetype,
+                    data: base64Image,
+                },
+            },
+        ];
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-exp",
+            contents,
+            config: {
+                responseModalities: [Modality.TEXT, Modality.IMAGE],
+            },
+        });
+
+        const parts = response.candidates[0].content.parts;
+        const textPart = parts.find((p) => p.text);         // textPart is an object
+
+        // console.log(textPart.text);
+
+        let jsonString = textPart.text.trim();
+        jsonString = jsonString.replace(/```json|```/g, '').trim();
+
+        const parsedMetadata = JSON.parse(jsonString);
+
+        if (!parsedMetadata) {
+            throw new Error('Failed to parse metadata JSON from Gemini response');
+        }
+
+        return parsedMetadata;
+
+    } catch (error) {
+        console.error('Error extracting metadata:', error);
+        return {
+            category: 'Uncategorized',
+            itemCategory: 'Uncategorized',
+            fabric: 'Unknown',
+            occasions: ['Casual'],
+            seasons: ['All Seasons'],
+            colors: ['Unknown'],
+            pattern: 'Unknown',
+            style: 'Unknown',
+            dateAdded: new Date().toISOString()
+        };
+    }
+}
+
+// Function to organize the clothing image into topwear and/or bottomwear folders
+async function organizeClothingImage(sourcePath, metadata) {
+    const savedLocations = [];
+
+    try {
+        // Create base directories if they don't exist
+        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
+        const topwearDir = path.join(baseDir, 'topwear');
+        const bottomwearDir = path.join(baseDir, 'bottomwear');
+
+        fs.mkdirSync(baseDir, { recursive: true });
+        fs.mkdirSync(topwearDir, { recursive: true });
+        fs.mkdirSync(bottomwearDir, { recursive: true });
+
+        // Generate a unique filename for the image
+        const uniqueFilename = `${Date.now()}-${path.basename(sourcePath)}`;
+
+        // Create a JSON metadata file name
+        const metadataFilename = uniqueFilename.replace(/\.[^/.]+$/, '.json');
+
+        // Get the category from metadata
+        const category = metadata.category.toLowerCase();
+
+        const metadataContent = JSON.stringify(metadata, null, 2);
+
+        // Based on the category, save the image to appropriate folders
+        if (category === 'topwear' || category === 'both') {
+            const topwearImagePath = path.join(topwearDir, uniqueFilename);
+            fs.copyFileSync(sourcePath, topwearImagePath);
+
+            const topwearMetadataPath = path.join(topwearDir, metadataFilename);
+            fs.writeFileSync(topwearMetadataPath, metadataContent);
+
+            savedLocations.push({
+                category: 'topwear',
+                imagePath: topwearImagePath,
+                metadataPath: topwearMetadataPath
+            });
+        }
+
+        if (category === 'bottomwear' || category === 'both') {
+            // Save to bottomwear folder
+            const bottomwearImagePath = path.join(bottomwearDir, uniqueFilename);
+            fs.copyFileSync(sourcePath, bottomwearImagePath);
+
+            // Copy metadata to bottomwear folder
+            const bottomwearMetadataPath = path.join(bottomwearDir, metadataFilename);
+            fs.writeFileSync(bottomwearMetadataPath, metadataContent);
+
+            savedLocations.push({
+                category: 'bottomwear',
+                imagePath: bottomwearImagePath,
+                metadataPath: bottomwearMetadataPath
+            });
+        }
+
+        return savedLocations;
+
+    } catch (error) {
+        console.error('Error organizing clothing image:', error);
+        throw new Error(`Failed to organize clothing image: ${error.message}`);
+    }
+}
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);

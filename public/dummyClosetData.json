@@ -1,0 +1,38 @@
+{
+  "categories": [
+    "Tops",
+    "Bottoms",
+    "Outerwear",
+    "Accessories",
+    "Shoes",
+    "Dresses",
+    "Activewear",
+    "Loungewear",
+    "Swimwear",
+    "Hats"
+  ],
+  "occasions": [
+    "Casual",
+    "Formal",
+    "Party",
+    "Office",
+    "Vacation",
+    "Wedding",
+    "Beach",
+    "Sport",
+    "Date Night",
+    "Festival"
+  ],
+  "fabrics": [
+    "Cotton",
+    "Denim",
+    "Silk",
+    "Wool",
+    "Leather",
+    "Linen",
+    "Polyester",
+    "Velvet",
+    "Chiffon",
+    "Cashmere"
+  ]
+}

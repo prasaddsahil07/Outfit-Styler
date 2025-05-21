@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Closet</title>
+  <link rel="stylesheet" href="myCloset.css" />
+</head>
+
+<body>
+
+  <header>
+    <h1>My Closet</h1>
+    <div class="weather-toggle">
+      <label for="weather-select" class="weather-label">Weather:</label>
+      <select id="weather-select" name="weather">
+        <option value="summer">Summer</option>
+        <option value="monsoon">Monsoon</option>
+        <option value="winter">Winter</option>
+      </select>
+    </div>
+  </header>
+
+
+  <main>
+    <div class="lists-container">
+      <section class="list-section" id="category-list">
+        <h2>Categories</h2>
+        <ul></ul>
+      </section>
+
+      <section class="list-section" id="occasion-list">
+        <h2>Occasions</h2>
+        <ul></ul>
+      </section>
+
+      <section class="list-section" id="fabric-list">
+        <h2>Fabrics</h2>
+        <ul></ul>
+      </section>
+    </div>
+
+    <section class="trending-section">
+      <h2 id="trending-heading">Trending Items</h2>
+      <div class="trending-grid" id="trending-items"></div>
+    </section>
+  </main>
+
+  <script src="myCloset.js"></script>
+</body>
+
+</html>

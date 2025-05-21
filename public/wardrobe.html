@@ -4,18 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <title>Fashion Styler</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="wardrobe.css" />
 </head>
 
 <body>
   <div class="container">
     <h1>Outfit Styler</h1>
     <form id="uploadForm">
-      <div class="field">
-        <label for="image">Upload Outfit:</label>
-        <input type="file" name="image" id="image" required />
-      </div>
-
       <div class="field">
         <label for="selectBodyPart">Select Outfit Type:</label>
         <select name="bodyPart" id="selectBodyPart" required>
@@ -24,7 +19,7 @@
           <option value="bottom">Bottom-wear</option>
         </select>
       </div>
-
+      
       <div class="field">
         <label for="occasion">Select Occasion:</label>
         <select name="occasion" id="selectOccasion" required>
@@ -42,7 +37,7 @@
     </form>
     <div id="results"></div>
   </div>
-  <script src="script.js"></script>
+  <script src="wardrobe.js"></script>
 </body>
 
 </html>

@@ -50,7 +50,6 @@ form .field label {
 }
 
 /* Input and Select Styling */
-form .field input[type="file"],
 form .field select {
   flex: 1;
   max-width: 400px;
@@ -63,12 +62,6 @@ form .field select {
   transition: border-color 0.3s;
 }
 
-/* Specific for file input */
-form .field input[type="file"] {
-  border-style: dashed;
-}
-
-form .field input[type="file"]:hover,
 form .field select:hover {
   border-color: #6c63ff;
 }
