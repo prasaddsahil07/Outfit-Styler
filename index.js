@@ -12,6 +12,7 @@ import { PythonShell } from "python-shell";
 
 
 import eventRoute from "./routes/events.routes.js";
+import userRoute from "./routes/users.routes.js";
 
 
 dotenv.config();
@@ -36,6 +37,9 @@ const __dirname = path.dirname(__filename);
 
 app.use(express.static("public"));
 
+
+// all routes
+app.use("/api/users", userRoute);
 app.use("/api/events", eventRoute);
 
 // app.post('/api/process-garment', upload.single('image'), async (req, res) => {
