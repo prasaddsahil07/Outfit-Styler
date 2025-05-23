@@ -14,6 +14,7 @@ import { PythonShell } from "python-shell";
 import eventRoute from "./routes/events.routes.js";
 import userRoute from "./routes/users.routes.js";
 import userBodyInfoRoute from "./routes/userBodyInfo.routes.js";
+import wardrobeRoute from "./routes/digitalWardrobe.controllers.js";
 
 
 dotenv.config();
@@ -43,6 +44,7 @@ app.use(express.static("public"));
 app.use("/api/users", userRoute);
 app.use("/api/events", eventRoute);
 app.use("/api/userBodyInfo", userBodyInfoRoute);
+app.use("/api/wardrobe", wardrobeRoute);
 
 // app.post('/api/process-garment', upload.single('image'), async (req, res) => {
 //     const category = req.body.category;
@@ -490,26 +492,25 @@ app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) =>
 async function extractClothingMetadata(base64Image, mimetype) {
     try {
         const prompt = `
-        You are a professional fashion analyst. Analyze the uploaded clothing item image with attention to detail and return **only the most accurate metadata** in JSON format.
-
-        Required JSON structure:
+        You are a fashion expert AI. Analyze the given garment image and extract structured metadata that can be used to categorize the clothing item in a digital wardrobe system.
+        Return the data in the following JSON format:
         {
-            "category": "topwear" | "bottomwear" | "both",
-            "itemCategories": ["specific", "types"],
-            "fabrics": [] | { "topwear": [], "bottomwear": [] },
-            "occasions": [] | { "topwear": [], "bottomwear": [] },
-            "seasons": ["season1", "season2"],
-            "colors": [] | { "topwear": [], "bottomwear": [] },
-            "pattern": "pattern_name",
-            "style": "style_description"
+        "category": "topwear | bottomwear | dress",
+        "color": { "name": "color name" },
+        "fabric": "e.g. Cotton, Denim, Silk, Wool, etc.",
+        "pattern": "e.g. Solid, Striped, Floral, Checkered, etc.",
+        "ai_tags": ["e.g. Stylish", "Comfortable", "Formal", "Trendy"],
+        "occasion": ["e.g. Casual", "Work", "Party", "Ethnic", "Gym"],
+        "season": ["e.g. Summer", "Winter", "Monsoon", "All-Season"]
         }
-
-        Rules:
-        1. ALL fields must be populated - no null/undefined
-        2. Return ONLY the JSON object - no markdown, no explanations
-        3. For "both" category, split properties by garment part
-        4. If uncertain, make educated guesses
-        `;
+        Important Guidelines:
+            -Identify the garment type (choose only from: topwear, bottomwear, dress).
+            -Return a dominant color name (simple term like "Black", "Beige", etc.).
+            -Estimate fabric type and pattern based on texture and design.
+            -Tag the garment with 3–5 relevant descriptive keywords (ai_tags).
+            -Suggest suitable occasions and seasons the item would be appropriate for.
+            -Use deep fashion knowledge to make the **best possible educated guess** for each field, even if the image is ambiguous. Do not leave any field blank or marked as "unknown" or "null".
+`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash-exp",

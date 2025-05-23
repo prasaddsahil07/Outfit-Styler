@@ -123,55 +123,53 @@ export const getEventDetails = async (req, res) => {
     }
 }
 
-function buildOutfitPrompt(occasion, dayTime, description) {
-    // Handle null/undefined description with more specific guidance
-    const descriptionPart = description && description.trim()
-        ? `Additional requirements: ${description.trim()}`
-        : "Focus on timeless, versatile styling";
+function buildOutfitPrompt(occasion, dayTime, description, userBodyInfo) {
+    const bodyShape = userBodyInfo?.bodyShapeAnalysis.bodyShape.classification || "not specified";
+    const skinTone = userBodyInfo?.bodyShapeAnalysis.skinTone.toneCategory || "not specified";
+    const gender = userBodyInfo?.bodyShapeAnalysis.gender.classification || "not specified";
+    const desc = description?.trim() 
+        ? `Additional styling notes: ${description.trim()}.` 
+        : "Focus on classic, versatile styling suitable for everyday wear.";
 
-    // Enhanced prompt with detailed specifications for optimal results
     return `
-        Think like a stylist and Create a photorealistic, high-quality outfit image featuring a complete, stylish ensemble with the following specifications:
+        You are a professional fashion stylist and visual designer. Your task is to generate a **photorealistic, magazine-quality outfit image** based on the user's profile and occasion. Design a full outfit that is cohesive, stylish, and wearable.
 
-        OCCASION & CONTEXT:
-        - Primary occasion: ${occasion || "versatile everyday wear"}
-        - Time of day: ${dayTime || "suitable for any time"}
-        - ${descriptionPart}
+        👤 USER PROFILE:
+        - Body shape: ${bodyShape}
+        - Skin tone: ${skinTone}
+        - Gender: ${gender}
 
-        OUTFIT REQUIREMENTS:
-        - Design a complete, coordinated outfit including: top, bottom, footwear, and appropriate accessories
-        - Ensure all pieces complement each other in color, texture, and style
-        - Make it season-appropriate and weather-suitable
-        - Include tasteful accessories that enhance the overall look
-        - Consider cultural appropriateness and modern fashion trends
+        📅 CONTEXT:
+        - Occasion: ${occasion || "everyday wear"}
+        - Time of day: ${dayTime || "anytime"}
+        - ${desc}
 
-        VISUAL SPECIFICATIONS:
-        - Use soft, natural lighting that flatters the garments and creates gentle shadows
-        - Set against a clean, neutral background (light gray, off-white, or subtle beige)
-        - Ensure high resolution and crisp detail on fabric textures and colors
-        - Display the outfit in a way that clearly shows all components
-        - Maintain professional photography quality with balanced exposure
+        👗 OUTFIT DESIGN:
+        - Include: top, bottom, shoes, and accessories (bag, jewelry, scarf, etc.)
+        - Color and fabric choices should suit skin tone and occasion
+        - Make it season-appropriate and culturally sensitive
+        - The overall outfit must be harmonious, flattering, and elegant
+        - Ensure each piece fits well and complements body shape
 
-        STYLE GUIDELINES:
-        - Prioritize timeless elegance combined with contemporary appeal
-        - Ensure the outfit is practical and comfortable for the intended use
-        - Balance colors harmoniously (consider complementary or monochromatic schemes)
-        - Include styling details that elevate the overall appearance
-        - Make it aspirational yet achievable for the average person
+        🖼️ VISUAL STYLE:
+        - High-resolution, clear fabric details
+        - Natural, soft lighting with gentle shadows
+        - Neutral background (light gray, beige, or off-white)
+        - Position outfit clearly to showcase all components
 
-        FINAL REQUIREMENTS:
-        - The result should be magazine-quality fashion photography
-        - All garments should appear well-fitted and properly styled
-        - The overall aesthetic should be polished, cohesive, and inspiring
-        - Ensure the outfit would photograph well in real life and be genuinely wearable
+        ✨ STYLE DIRECTION:
+        - Blend timeless elegance with a modern twist
+        - Colors should be balanced and fashion-forward
+        - Add tasteful styling elements that elevate the look
+        - Prioritize comfort, functionality, and real-world wearability
 
-        Generate the most stylish, appropriate, and visually appealing outfit possible for this specific context.
+        Final goal: A visually stunning, realistic outfit that aligns with user traits and the specific occasion. The result should look like it belongs on the cover of a fashion magazine.
     `.replace(/\s+/g, ' ').trim();
 }
 
-async function generateOutfitAsPerRequirements(occasion, dayTime, description) {
+async function generateOutfitAsPerRequirements(occasion, dayTime, description, userBodyInfo) {
     try {
-        const prompt = buildOutfitPrompt(occasion, dayTime, description);
+        const prompt = buildOutfitPrompt(occasion, dayTime, description, userBodyInfo);
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash-preview-image-generation",
@@ -228,13 +226,22 @@ export const styleForEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found' });
         }
 
+        const userId = req.user._id;
+        // Check if the user is authorized to style this event
+        if(event.userId.toString() !== userId.toString()) {
+            return res.status(403).json({ message: 'Unauthorized to style this event' });
+        }
+
+        const userBodyInfo = req.user.userBodyInfo;
+
         // fetch user body data here to give more personalized outfit
 
         if (!event.isStyled || !event.generatedImages || event.generatedImages.length === 0) {
             const genResult = await generateOutfitAsPerRequirements(
                 event.occasion,
                 event.dayTime,
-                event.description
+                event.description,
+                userBodyInfo
             );
 
             // console.log("GEN RESULT:", genResult);
