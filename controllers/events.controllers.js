@@ -1,4 +1,4 @@
-import Event from '../models/events.models.js';
+import {Event} from '../models/events.models.js';
 import { ai } from "../index.js";
 import { Modality } from "@google/genai";
 import path from "path";

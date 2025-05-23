@@ -31,19 +31,10 @@ const userSchema = new mongoose.Schema({
         trim:true,
         index:true
     },
-    // profilePicture:{
-    //     type:String,
-    //     default:"https://res.cloudinary.com/dqj0v4x8h/image/upload/v1698231231/DefaultProfilePicture.png"
-    // },
-    // userInfo:{
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'UserInfo'
-    // },
-    // authMethods:{
-    //     type:String,
-    //     enum:['email', 'google', 'facebook'],
-    //     default:'email'
-    // },
+    userBodyInfo : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'UserBodyInfo'
+    },
     events:[{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Event'
