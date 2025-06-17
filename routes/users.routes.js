@@ -1,11 +1,15 @@
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { Router } from "express";
 import { registerUser, loginUser, logoutUser, getUserProfile, changeUserPassword, updateUserProfile, refreshAccessToken } from "../controllers/users.controllers.js";
+import {upload} from "../middleware/multer.middleware.js";
 
 const router = Router();
 
 // Register a new user
-router.post("/register", registerUser);
+router.post("/register", upload.fields([{
+    name: 'profilePicture',
+    maxCount: 1
+}]), registerUser);
 // Login a user
 router.post("/login", loginUser);
 // Logout a user

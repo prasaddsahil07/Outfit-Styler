@@ -1,0 +1,158 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f4f6f8;
+  margin: 0;
+  padding: 2rem;
+  color: #333;
+}
+
+.carousel-container {
+  position: relative;
+  max-width: 1200px;
+  margin: auto;
+  overflow: hidden;
+}
+
+.carousel-container h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  color: #2c3e50;
+}
+
+.carousel {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 2rem;
+  scrollbar-width: none; /* Firefox */
+}
+
+.carousel::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+.card {
+  flex: 0 0 calc(25% - 1.5rem);
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 16px 16px 0 0;
+}
+
+.card-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.card-content h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem 0;
+  color: #1a1a1a;
+  line-height: 1.4;
+}
+
+.card-content p {
+  font-size: 0.95rem;
+  color: #555;
+  margin-bottom: 0.75rem;
+  flex-grow: 1;
+}
+
+.card-content .source {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 1rem;
+}
+
+.share-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.share-buttons a {
+  text-decoration: none;
+  font-size: 0.85rem;
+  background: #e9ecef;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  color: #2c3e50;
+  transition: background 0.3s, color 0.3s;
+}
+
+.share-buttons a:hover {
+  background: #2c3e50;
+  color: #ffffff;
+}
+
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #2c3e50;
+  color: white;
+  border: none;
+  font-size: 2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.nav:hover {
+  opacity: 1;
+}
+
+.prev {
+  left: -2rem;
+}
+.next {
+  right: -2rem;
+}
+
+/* Responsive for tablets */
+@media (max-width: 992px) {
+  .card {
+    flex: 0 0 calc(33.33% - 1rem);
+  }
+}
+
+/* Responsive for smaller screens */
+@media (max-width: 768px) {
+  .card {
+    flex: 0 0 calc(50% - 1rem);
+  }
+}
+
+/* Responsive for phones */
+@media (max-width: 480px) {
+  .card {
+    flex: 0 0 100%;
+  }
+}

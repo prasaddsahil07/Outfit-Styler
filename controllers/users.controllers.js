@@ -1,5 +1,6 @@
 import { User } from '../models/users.models.js';
 import jwt from 'jsonwebtoken';
+import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -50,6 +51,14 @@ export const registerUser = async (req, res) => {
         return res.status(409).json({ msg: "user already exits" })
     }
 
+    const profilePictureLocalPath = req.file?.profilePicture[0].path; // getting profile picture from req.file
+
+    const profilePicUrl = await uploadOnCloudinary(profilePictureLocalPath); // uploading profile picture to cloudinary
+
+    if (!profilePicUrl) {
+        return res.status(500).json({ msg: "Failed to upload profile picture" });
+    }
+
 
     //creating new user in the database
     const user = await User.create({
@@ -57,14 +66,9 @@ export const registerUser = async (req, res) => {
         email,
         username: username.toLowerCase(),
         phone,
-        password
+        password,
+        profilePicture: profilePicUrl,  // saving profile picture url in the database
     })
-
-
-    // //checking if user created successfully
-    // const createdUser = await User.findById(user._id).select(
-    //     "-password -refreshToken"   // don't pass password and refreshToken from response
-    // )
 
     //this will return user data if user is founded if not then
     if (!user) {
@@ -221,5 +225,43 @@ export const updateUserProfile = async (req, res) => {
         return res.status(200).json({ msg: "User profile updated successfully", data: user });
     } catch (error) {
         return res.status(500).json({ msg: "Something went wrong while updating user profile" });
+    }
+}
+
+// update the user profile picture
+export const updateUserProfilePicture = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(404).json({ msg: "User not found while updating profile picture" });
+        }
+
+        const profilePictureLocalPath = req.file?.profilePicture[0].path;
+
+        if(!profilePictureLocalPath) {
+            return res.status(400).json({ msg: "Profile picture is required" });
+        }
+
+        const profilePicUrl = await uploadOnCloudinary(profilePictureLocalPath);
+        if (!profilePicUrl) {
+            return res.status(500).json({ msg: "Failed to upload profile picture" });
+        }
+
+        await deleteFromCloudinary(user.profilePicture); // delete old profile picture from cloudinary
+
+        const updatedUserProfilePic = await User.findByIdAndUpdate(
+            user._id,
+            {
+            $set: {
+                profilePicture: profilePicUrl
+            }
+        }, { new: true }).select("-password")
+
+        res.status(200).json({
+            msg: "User profile picture updated successfully",
+        });
+
+    } catch (error) {
+        return res.status(500).json({ msg: "Something went wrong while updating user profile picture" });        
     }
 }

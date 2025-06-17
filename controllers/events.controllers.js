@@ -1,16 +1,18 @@
-import {Event} from '../models/events.models.js';
+import { Event } from '../models/events.models.js';
 import { ai } from "../index.js";
 import { Modality } from "@google/genai";
 import path from "path";
 import fs from "fs";
+import {User} from "../models/users.models.js";
 
 export const addEvent = async (req, res) => {
     const user = req.user;
-    if (!user) {   
+    if (!user) {
         return res.status(401).json({ message: 'Unauthorized' });
     }
+
     const userId = user._id;
-    const { name, date, dayTime, occasion, isStyled, description, generatedImages } = req.body;
+    const { name, date, dayTime, occasion, isStyled, description, generatedImages, reminders } = req.body;
 
     try {
         const newEvent = await Event.create({
@@ -21,7 +23,13 @@ export const addEvent = async (req, res) => {
             occasion,
             isStyled,
             description,
-            generatedImages
+            generatedImages,
+            reminders: reminders?.map(r => ({ timeBefore: r.timeBefore })) || []
+        });
+
+        // Add event to user's list of events
+        await User.findByIdAndUpdate(userId, {
+            $push: { events: newEvent._id }
         });
 
         res.status(201).json({ message: 'Event created successfully', event: newEvent });
@@ -30,9 +38,10 @@ export const addEvent = async (req, res) => {
     }
 };
 
+
 export const updateEvent = async (req, res) => {
     const { id } = req.params;
-    const { name, date, dayTime, occasion, isStyled, description, generatedImages } = req.body;
+    const { name, date, dayTime, occasion, isStyled, description, generatedImages, reminders } = req.body;
 
     try {
         const event = await Event.findById(id);
@@ -40,17 +49,28 @@ export const updateEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found' });
         }
 
-        // Check if the user is authorized to update this event
         if (event.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: 'Unauthorized to update this event' });
         }
 
-        // Update the event with the new data
-        const updatedEvent = await Event.findByIdAndUpdate(
-            id,
-            { name, date, dayTime, occasion, isStyled, description, generatedImages },
-            { new: true }
-        );
+        const updatedFields = {
+            name,
+            date,
+            dayTime,
+            occasion,
+            isStyled,
+            description,
+            generatedImages
+        };
+
+        if (reminders) {
+            updatedFields.reminders = reminders.map(r => ({
+                timeBefore: r.timeBefore,
+                isSent: false // Reset reminders on update
+            }));
+        }
+
+        const updatedEvent = await Event.findByIdAndUpdate(id, updatedFields, { new: true });
 
         if (!updatedEvent) {
             return res.status(404).json({ message: 'Event not found' });
@@ -62,6 +82,7 @@ export const updateEvent = async (req, res) => {
     }
 };
 
+
 export const deleteEvent = async (req, res) => {
     const { id } = req.params;
 
@@ -71,13 +92,17 @@ export const deleteEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found' });
         }
 
-        // Check if the user is authorized to delete this event
         if (event.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: 'Unauthorized to delete this event' });
         }
 
-        // Delete the event        
+        // Delete the event
         await Event.findByIdAndDelete(id);
+
+        // Remove the event reference from the user's events array
+        await User.findByIdAndUpdate(event.userId, {
+            $pull: { events: id }
+        });
 
         return res.status(200).json({ message: 'Event deleted successfully' });
     } catch (error) {
@@ -89,9 +114,11 @@ export const fetchAllEvents = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
-            return res.status(401).json({ message: 'Unauthorized' });   
+            return res.status(401).json({ message: 'Unauthorized' });
         }
+
         const events = await Event.find({ userId: user._id });
+
         if (!events || events.length === 0) {
             return res.status(404).json({ message: 'No events found' });
         }
@@ -109,9 +136,8 @@ export const getEventDetails = async (req, res) => {
         const eventDetails = await Event.findById(id);
         if (!eventDetails) {
             return res.status(404).json({ message: 'Event not found' });
-        };
+        }
 
-        // Check if the user is authorized to view this event
         if (eventDetails.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: 'Unauthorized to view this event' });
         }
@@ -121,7 +147,8 @@ export const getEventDetails = async (req, res) => {
         console.log("error : ", error.message);
         return res.status(500).json({ message: 'Error fetching event details', error: error.message });
     }
-}
+};
+
 
 function buildOutfitPrompt(occasion, dayTime, description, userBodyInfo) {
     const bodyShape = userBodyInfo?.bodyShapeAnalysis.bodyShape.classification || "not specified";

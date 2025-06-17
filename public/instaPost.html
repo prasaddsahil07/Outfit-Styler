@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Fashion Upload</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      padding: 2rem;
+      background: linear-gradient(to right, #ffe0f0, #f0f4ff);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h2 {
+      color: #c2185b;
+      margin-bottom: 1.5rem;
+    }
+
+    form {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    label {
+      font-weight: 500;
+      display: block;
+      margin-bottom: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+
+    button {
+      background-color: #d81b60;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      margin-top: 1rem;
+    }
+
+    button:hover {
+      background-color: #ad1457;
+    }
+
+    .preview {
+      margin-top: 2rem;
+      max-width: 600px;
+    }
+
+    .preview p {
+      font-weight: 500;
+      color: #4caf50;
+    }
+
+    .preview img {
+      max-width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    .error {
+      color: #e53935;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>👗 Upload Daily Fashion Picks</h2>
+
+  <form id="uploadForm">
+    <label for="images">Choose images (multiple allowed):</label>
+    <input type="file" id="images" name="images" accept="image/*" multiple required />
+
+    <label for="caption">Write a caption (optional):</label>
+    <textarea id="caption" name="caption" rows="3" placeholder="E.g. Floral spring dress for a casual brunch..."></textarea>
+
+    <button type="submit">Upload Images</button>
+  </form>
+
+  <div class="preview" id="preview"></div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const preview = document.getElementById('preview');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      preview.innerHTML = "";
+
+      const files = document.getElementById('images').files;
+      const caption = document.getElementById('caption').value;
+      const formData = new FormData();
+
+      for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
+      }
+
+      formData.append("caption", caption);
+
+      try {
+        const res = await fetch("http://localhost:3000/api/instaPosts/dailyPost", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+        preview.innerHTML += `<p>✅ ${data.message}</p>`;
+        data.posts.forEach(post => {
+            preview.innerHTML += `<img src="${post.imageUrl}" alt="Fashion Upload" />`;
+          });
+          form.reset();
+        } else {
+          preview.innerHTML = `<p class="error">❌ Error: ${data.message}</p>`;
+        }
+      } catch (err) {
+        console.error(err);
+        preview.innerHTML = `<p class="error">❌ Upload failed. Please try again.</p>`;
+      }
+    });
+  </script>
+</body>
+</html>

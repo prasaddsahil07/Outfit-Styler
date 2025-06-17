@@ -31,18 +31,29 @@ const userSchema = new mongoose.Schema({
         trim:true,
         index:true
     },
-    userBodyInfo : {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'UserBodyInfo'
-    },
-    events:[{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Event'
-    }],
     password:{
         type:String,
         required:[true, 'Password is required!']
     },
+    profilePicture:{
+        type: String,   
+    },
+    wardrobe: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DigitalWardrobe'
+    },
+    userBodyInfo : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'UserBodyInfo'
+    },
+    savedImages: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'SavedImage'
+    }],
+    events:[{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event'
+    }],
     refreshToken:{
         type:String
     }

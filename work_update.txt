@@ -1,0 +1,7 @@
+FUTURE SCOPE:
+We need to take care of location and integrate it with temperature as a L2 vacation destination.
+OTT use cases like destination weddings and related styling.
+We can incorporate the user body profile data so that the generated model can match the user's look.
+Using mannequins/models is useful, it takes care of the multiple combo issue.
+Instead of random models, can't we use actual person as a model.
+Pop up notification to upload more images in digital wardrobe(once they logged in and don't have sufficient items in wardrobe , say < 10)

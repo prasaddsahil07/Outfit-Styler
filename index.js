@@ -8,14 +8,23 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { connectDB } from "./db/connectDB.js";
-import { PythonShell } from "python-shell";
+import cors from "cors";
+// import { PythonShell } from "python-shell";
+// import { updateCache } from "./controllers/homeScreen.controllers.js";
+
 
 
 import eventRoute from "./routes/events.routes.js";
 import userRoute from "./routes/users.routes.js";
 import userBodyInfoRoute from "./routes/userBodyInfo.routes.js";
-import wardrobeRoute from "./routes/digitalWardrobe.controllers.js";
-
+import wardrobeRoute from "./routes/digitalWardrobe.routes.js";
+import imageRoute from "./routes/image.js";
+import savedImagesRoute from "./routes/savedImages.routes.js";
+import fashionNewsRoute from "./routes/homeScreen.routes.js";
+import dailyPostRoute from "./routes/dailyPost.routes.js";
+import instaPostRoute from "./routes/instaPosts.routes.js";
+import styleRecommenderRoute from "./routes/styleRecommender.routes.js";
+// import newsRoute from "./routes/news.js";
 
 dotenv.config();
 
@@ -37,7 +46,22 @@ app.use("/static", express.static("static"));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Create /tmp dir if it doesn't exist
+const tmpPath = path.join(__dirname, "tmp");
+if (!fs.existsSync(tmpPath)) {
+  fs.mkdirSync(tmpPath);
+}
+
+app.use("/upload", imageRoute);
+
+
 app.use(express.static("public"));
+
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+}));
 
 
 // all routes
@@ -45,6 +69,17 @@ app.use("/api/users", userRoute);
 app.use("/api/events", eventRoute);
 app.use("/api/userBodyInfo", userBodyInfoRoute);
 app.use("/api/wardrobe", wardrobeRoute);
+app.use("/api/savedImages", savedImagesRoute);
+app.use("/api/fashionNews", fashionNewsRoute);
+app.use("/api/dailyPost", dailyPostRoute);
+app.use("/api/instaPosts", instaPostRoute);
+app.use("/api/styleRecommender", styleRecommenderRoute);
+// app.use("/api/fashion", newsRoute);
+
+
+// Initial fetch and 12-hour interval update
+// updateCache();
+// setInterval(updateCache,  60 * 60 * 1000); // Every 12 hours
 
 // app.post('/api/process-garment', upload.single('image'), async (req, res) => {
 //     const category = req.body.category;
@@ -266,7 +301,6 @@ app.get("/filter-wardrobe", async (req, res) => {
     }
 });
 
-
 app.post("/generate-image", upload.single("image"), async (req, res) => {
     try {
         const clothingType = req.body.bodyPart;
@@ -281,11 +315,11 @@ app.post("/generate-image", upload.single("image"), async (req, res) => {
         const prompt = `
 Approach this like a professional fashion stylist creating 3 distinct editorials based on one key garment.
 
-Generate **three visually distinct complete outfits** in a flatlay/editorial style with modern Pinterest fashion aesthetic, using the uploaded ${clothingType} as the central piece for all three looks.
+Generate **three visually distinct complete outfits** in a flatlay/editorial style with modern Pinterest fashion aesthetic, using the uploaded topwear as the central piece for all three looks.
 
 CRITICAL REQUIREMENTS:
-1. The uploaded ${clothingType} item MUST appear EXACTLY as provided in all three images - do not alter its color, shape, pattern, style, size, or any visual characteristics.
-2. Create three COMPLETELY DIFFERENT outfit combinations around this ${clothingType} for the "${occasion}" occasion.
+1. The uploaded topwear item MUST appear EXACTLY as provided in all three images - do not alter its color, shape, pattern, style, size, or any visual characteristics.
+2. Create three COMPLETELY DIFFERENT outfit combinations around this topwear for the "date-night" occasion.
 
 For each complete outfit:
 - If user uploaded topwear: Add different bottoms, shoes, and accessories for each look
@@ -303,8 +337,14 @@ The goal is to showcase styling versatility by creating three distinct aesthetic
 `;
 
 
+    const prompt1 = `Take the uploaded image and mask all the items present (e.g., clothes, accessories, shoes, bags). Create a new image where these items are cleanly extracted and arranged together in a flatlay style — like how items are laid out on Pinterest fashion boards.
+
+The background should be neutral (light gray or beige), and the lighting must be soft and diffused, avoiding harsh shadows. The resulting image should look professionally styled, with a minimalist flatlay aesthetic.
+
+Ensure that the items are clearly visible, properly aligned, and spaced aesthetically. Do not include the original photo's background or body — only the segmented items should be retained.`
+
         const contents = [
-            { text: prompt },
+            { text: prompt1 },
             {
                 inlineData: {
                     mimeType: req.file.mimetype,
@@ -336,12 +376,12 @@ The goal is to showcase styling versatility by creating three distinct aesthetic
 
             if (imagePart) {
                 results.push({
-                    style: `${occasion} #${i}`,
+                    style: `${occasion}`,
                     base64: imagePart.inlineData.data,
                 });
             } else {
                 results.push({
-                    style: `${occasion} #${i}`,
+                    style: `${occasion}`,
                     error: "No image returned from Gemini",
                 });
             }
@@ -489,28 +529,33 @@ app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) =>
 });
 
 // Function to extract clothing metadata using Gemini API
-async function extractClothingMetadata(base64Image, mimetype) {
+export async function extractClothingMetadata(base64Image, mimetype) {
     try {
         const prompt = `
-        You are a fashion expert AI. Analyze the given garment image and extract structured metadata that can be used to categorize the clothing item in a digital wardrobe system.
-        Return the data in the following JSON format:
-        {
-        "category": "topwear | bottomwear | dress",
-        "color": { "name": "color name" },
-        "fabric": "e.g. Cotton, Denim, Silk, Wool, etc.",
-        "pattern": "e.g. Solid, Striped, Floral, Checkered, etc.",
-        "ai_tags": ["e.g. Stylish", "Comfortable", "Formal", "Trendy"],
-        "occasion": ["e.g. Casual", "Work", "Party", "Ethnic", "Gym"],
-        "season": ["e.g. Summer", "Winter", "Monsoon", "All-Season"]
-        }
-        Important Guidelines:
-            -Identify the garment type (choose only from: topwear, bottomwear, dress).
-            -Return a dominant color name (simple term like "Black", "Beige", etc.).
-            -Estimate fabric type and pattern based on texture and design.
-            -Tag the garment with 3–5 relevant descriptive keywords (ai_tags).
-            -Suggest suitable occasions and seasons the item would be appropriate for.
-            -Use deep fashion knowledge to make the **best possible educated guess** for each field, even if the image is ambiguous. Do not leave any field blank or marked as "unknown" or "null".
-`;
+            You are a fashion expert AI. Analyze the given image, which may contain either:
+            - A single dress
+            - A combination of topwear and bottomwear
+
+            Return the extracted metadata in this format:
+
+            [
+                {
+                    "category": "topwear | bottomwear | dress",
+                    "color": "e.g. Beige, Navy Blue",
+                    "fabric": "e.g. Cotton, Denim, Silk, Wool, etc.",
+                    "pattern": "e.g. Solid, Striped, Floral, Checkered, etc.",
+                    "ai_tags": ["e.g. Stylish", "Comfortable", "Formal", "Trendy"],
+                    "occasion": ["e.g. Casual", "Work", "Party", "Ethnic", "Gym"],
+                    "season": ["e.g. Summer", "Winter", "Monsoon", "All-Season"]
+                }
+            ]
+
+            Guidelines:
+            - Always return an array with one or two objects (depending on how many distinct garments are visible).
+            - Use the best possible educated guess based on visual cues.
+            - Never return null or unknown values.
+            `;
+
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash-exp",
@@ -542,18 +587,61 @@ async function extractClothingMetadata(base64Image, mimetype) {
         const parsedMetadata = JSON.parse(jsonString);
 
         // Validate required fields
-        const requiredFields = ['category', 'itemCategories', 'fabrics', 'occasions', 'seasons', 'colors', 'pattern', 'style'];
-        for (const field of requiredFields) {
-            if (!parsedMetadata[field]) {
-                throw new Error(`Missing required field: ${field}`);
-            }
-        }
+        // const requiredFields = ['category', 'itemCategories', 'fabrics', 'occasions', 'seasons', 'colors', 'pattern', 'style'];
+        // for (const field of requiredFields) {
+        //     if (!parsedMetadata[field]) {
+        //         throw new Error(`Missing required field: ${field}`);
+        //     }
+        // }
 
         return parsedMetadata;
 
     } catch (error) {
         console.error('Metadata extraction error:', error);
         return getFallbackMetadata();
+    }
+}
+
+// Function to exctract complementary item metadata using Gemini API
+export async function extractComplementaryClothMetaData(base64Image, occasion, preservedType, mimetype) {
+    try {
+        const prompt = `You are a fashion stylist. A user uploaded a ${preservedType} outfit for a ${occasion} occasion. Suggest a complementary clothing item (not repeating the preserved type). 
+        Return a JSON with fields: category, color, fabric, pattern, season, ai_tags.`;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-exp",
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    {
+                        inlineData: {
+                            mimeType: mimetype || "image/jpeg",
+                            data: base64Image
+                        }
+                    }
+                ]
+            }],
+            generationConfig: {
+                response_mime_type: "application/json"
+                
+            }
+        });
+
+        // Extract and clean JSON response
+        const textResponse = response.candidates[0]?.content?.parts?.[0]?.text || '';
+        const jsonString = textResponse
+            .replace(/^```json|```$/g, '')
+            .replace(/^```|```$/g, '')
+            .trim();
+
+        if (!jsonString) throw new Error('Empty response from Gemini');
+
+        const parsedMetadata = JSON.parse(jsonString);
+
+        return parsedMetadata;
+    } catch (error) {
+        console.error("Error extracting complementary clothing metadata:", error);
+        throw error;
     }
 }
 

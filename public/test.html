@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Style Recommender Tester</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 2rem;
+      background: #f2f2f2;
+      color: #333;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+
+    input, select, button {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+
+    button {
+      margin-top: 1.5rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    #output {
+      margin-top: 2rem;
+    }
+
+    #output img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 1rem;
+      border: 1px solid #ccc;
+    }
+
+    .feedback {
+      margin-top: 1rem;
+      background: #f9f9f9;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .feedback ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+    }
+
+    .message {
+      margin-top: 1rem;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Style Recommender</h1>
+    <form id="styleForm">
+      <label for="images">Upload up to 4 images (e.g., topwear, footwear):</label>
+      <input type="file" name="images" id="images" accept="image/*" multiple required>
+
+      <label for="occasion">Choose an occasion:</label>
+      <select name="occasion" id="occasion" required>
+        <option value="">-- Select Occasion --</option>
+        <option value="office">Office</option>
+        <option value="party">Party</option>
+        <option value="vacation">Vacation</option>
+        <option value="casual">Casual</option>
+        <option value="wedding">Wedding</option>
+      </select>
+
+      <button type="submit">Generate Outfit</button>
+    </form>
+
+    <div id="output"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("styleForm");
+    const output = document.getElementById("output");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      output.innerHTML = "<p>Processing... please wait ⏳</p>";
+
+      const formData = new FormData();
+      const files = form.images.files;
+      const occasion = form.occasion.value;
+
+      for (let file of files) {
+        formData.append("images", file);
+      }
+      formData.append("occasion", occasion);
+
+      try {
+        const response = await fetch("http://localhost:3000/api/styleRecommender", {
+          method: "POST",
+          body: formData,
+        });
+
+        const { mannequinImageBase, message, recommendations } = response;
+
+        const feedbackHTML = Array.isArray(recommendations)
+          ? `<ul>${recommendations.map(r => `<li>${r}</li>`).join("")}</ul>`
+          : `<pre>${JSON.stringify(recommendations, null, 2)}</pre>`;
+
+        output.innerHTML = `
+          ${mannequinImageBase ? `<img src="${mannequinImageBase}" alt="Mannequin Outfit">` : ""}
+          ${message ? `<div class="message">${message}</div>` : ""}
+          <div class="feedback">
+            <h3>Style Feedback:</h3>
+            ${feedbackHTML}
+          </div>
+        `;
+      } catch (err) {
+        output.innerHTML = `<p style="color:red;">❌ Error: ${err.message}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
