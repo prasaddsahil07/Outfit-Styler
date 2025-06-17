@@ -11,30 +11,65 @@ export const addEvent = async (req, res) => {
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const userId = user._id;
-    const { name, date, dayTime, occasion, isStyled, description, generatedImages, reminders } = req.body;
-
     try {
-        const newEvent = await Event.create({
-            userId,
-            name,
-            date,
-            dayTime,
+        const userId = user._id;
+        const {
+            title,
             occasion,
-            isStyled,
+            start_date,
+            end_date,
+            is_multi_day,
+            event_type,
+            time,
+            location,
             description,
-            generatedImages,
-            reminders: reminders?.map(r => ({ timeBefore: r.timeBefore })) || []
-        });
+            reminder,
+            reminder_value,
+            reminder_type,
+            day_specific_data
+        } = req.body;
 
-        // Add event to user's list of events
-        await User.findByIdAndUpdate(userId, {
-            $push: { events: newEvent._id }
-        });
+        const eventData = {
+            userId,
+            title,
+            occasion,
+            startDate: new Date(start_date),
+            endDate: new Date(end_date),
+            isMultiDay: is_multi_day,
+        };
 
-        res.status(201).json({ message: 'Event created successfully', event: newEvent });
+        if (is_multi_day) {
+            // Handle multi-day event
+            eventData.daySpecificData = Object.entries(day_specific_data).map(([dateStr, data]) => ({
+                date: new Date(dateStr),
+                eventType: data.event,
+                startTime: data.time,
+                location: data.location,
+                description: data.description,
+                reminder: {
+                    value: data.reminderValue,
+                    type: data.reminderType,
+                    text: data.reminder
+                }
+            }));
+        } else {
+            // Handle single-day event
+            eventData.eventType = event_type;
+            eventData.startTime = time;
+            eventData.location = location;
+            eventData.description = description;
+            eventData.reminder = {
+                value: reminder_value,
+                type: reminder_type,
+                text: reminder
+            };
+        }
+
+        const event = new Event(eventData);
+        await event.save();
+        res.status(201).json(event);
     } catch (error) {
-        res.status(500).json({ message: 'Error creating event', error: error.message });
+        res.status(400).json({ error: error.message });
     }
 };
 
@@ -150,101 +185,101 @@ export const getEventDetails = async (req, res) => {
 };
 
 
-function buildOutfitPrompt(occasion, dayTime, description, userBodyInfo) {
-    const bodyShape = userBodyInfo?.bodyShapeAnalysis.bodyShape.classification || "not specified";
-    const skinTone = userBodyInfo?.bodyShapeAnalysis.skinTone.toneCategory || "not specified";
-    const gender = userBodyInfo?.bodyShapeAnalysis.gender.classification || "not specified";
-    const desc = description?.trim() 
-        ? `Additional styling notes: ${description.trim()}.` 
-        : "Focus on classic, versatile styling suitable for everyday wear.";
+// function buildOutfitPrompt(occasion, dayTime, description, userBodyInfo) {
+//     const bodyShape = userBodyInfo?.bodyShapeAnalysis.bodyShape.classification || "not specified";
+//     const skinTone = userBodyInfo?.bodyShapeAnalysis.skinTone.toneCategory || "not specified";
+//     const gender = userBodyInfo?.bodyShapeAnalysis.gender.classification || "not specified";
+//     const desc = description?.trim() 
+//         ? `Additional styling notes: ${description.trim()}.` 
+//         : "Focus on classic, versatile styling suitable for everyday wear.";
 
-    return `
-        You are a professional fashion stylist and visual designer. Your task is to generate a **photorealistic, magazine-quality outfit image** based on the user's profile and occasion. Design a full outfit that is cohesive, stylish, and wearable.
+//     return `
+//         You are a professional fashion stylist and visual designer. Your task is to generate a **photorealistic, magazine-quality outfit image** based on the user's profile and occasion. Design a full outfit that is cohesive, stylish, and wearable.
 
-        👤 USER PROFILE:
-        - Body shape: ${bodyShape}
-        - Skin tone: ${skinTone}
-        - Gender: ${gender}
+//         👤 USER PROFILE:
+//         - Body shape: ${bodyShape}
+//         - Skin tone: ${skinTone}
+//         - Gender: ${gender}
 
-        📅 CONTEXT:
-        - Occasion: ${occasion || "everyday wear"}
-        - Time of day: ${dayTime || "anytime"}
-        - ${desc}
+//         📅 CONTEXT:
+//         - Occasion: ${occasion || "everyday wear"}
+//         - Time of day: ${dayTime || "anytime"}
+//         - ${desc}
 
-        👗 OUTFIT DESIGN:
-        - Include: top, bottom, shoes, and accessories (bag, jewelry, scarf, etc.)
-        - Color and fabric choices should suit skin tone and occasion
-        - Make it season-appropriate and culturally sensitive
-        - The overall outfit must be harmonious, flattering, and elegant
-        - Ensure each piece fits well and complements body shape
+//         👗 OUTFIT DESIGN:
+//         - Include: top, bottom, shoes, and accessories (bag, jewelry, scarf, etc.)
+//         - Color and fabric choices should suit skin tone and occasion
+//         - Make it season-appropriate and culturally sensitive
+//         - The overall outfit must be harmonious, flattering, and elegant
+//         - Ensure each piece fits well and complements body shape
 
-        🖼️ VISUAL STYLE:
-        - High-resolution, clear fabric details
-        - Natural, soft lighting with gentle shadows
-        - Neutral background (light gray, beige, or off-white)
-        - Position outfit clearly to showcase all components
+//         🖼️ VISUAL STYLE:
+//         - High-resolution, clear fabric details
+//         - Natural, soft lighting with gentle shadows
+//         - Neutral background (light gray, beige, or off-white)
+//         - Position outfit clearly to showcase all components
 
-        ✨ STYLE DIRECTION:
-        - Blend timeless elegance with a modern twist
-        - Colors should be balanced and fashion-forward
-        - Add tasteful styling elements that elevate the look
-        - Prioritize comfort, functionality, and real-world wearability
+//         ✨ STYLE DIRECTION:
+//         - Blend timeless elegance with a modern twist
+//         - Colors should be balanced and fashion-forward
+//         - Add tasteful styling elements that elevate the look
+//         - Prioritize comfort, functionality, and real-world wearability
 
-        Final goal: A visually stunning, realistic outfit that aligns with user traits and the specific occasion. The result should look like it belongs on the cover of a fashion magazine.
-    `.replace(/\s+/g, ' ').trim();
-}
+//         Final goal: A visually stunning, realistic outfit that aligns with user traits and the specific occasion. The result should look like it belongs on the cover of a fashion magazine.
+//     `.replace(/\s+/g, ' ').trim();
+// }
 
-async function generateOutfitAsPerRequirements(occasion, dayTime, description, userBodyInfo) {
-    try {
-        const prompt = buildOutfitPrompt(occasion, dayTime, description, userBodyInfo);
+// async function generateOutfitAsPerRequirements(occasion, dayTime, description, userBodyInfo) {
+//     try {
+//         const prompt = buildOutfitPrompt(occasion, dayTime, description, userBodyInfo);
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-preview-image-generation",
-            contents: prompt,
-            config: {
-                responseModalities: [Modality.TEXT, Modality.IMAGE],
-            },
-        });
+//         const response = await ai.models.generateContent({
+//             model: "gemini-2.0-flash-preview-image-generation",
+//             contents: prompt,
+//             config: {
+//                 responseModalities: [Modality.TEXT, Modality.IMAGE],
+//             },
+//         });
 
-        const result = {
-            textDescription: "",
-            imageUrl: "",
-            status: "success",
-        };
+//         const result = {
+//             textDescription: "",
+//             imageUrl: "",
+//             status: "success",
+//         };
 
-        for (const part of response.candidates[0].content.parts) {
-            if (part.text) {
-                result.textDescription = part.text;
-            } else if (part.inlineData) {
-                const imageDataB64 = part.inlineData.data;
-                const buffer = Buffer.from(imageDataB64, "base64");
+//         for (const part of response.candidates[0].content.parts) {
+//             if (part.text) {
+//                 result.textDescription = part.text;
+//             } else if (part.inlineData) {
+//                 const imageDataB64 = part.inlineData.data;
+//                 const buffer = Buffer.from(imageDataB64, "base64");
 
-                // Ensure folder exists
-                const imagesDir = path.join("static", "images");
-                fs.mkdirSync(imagesDir, { recursive: true });
+//                 // Ensure folder exists
+//                 const imagesDir = path.join("static", "images");
+//                 fs.mkdirSync(imagesDir, { recursive: true });
 
-                const filename = `outfit_${Date.now()}.png`;
-                const filepath = path.join(imagesDir, filename);
-                fs.writeFileSync(filepath, buffer);
+//                 const filename = `outfit_${Date.now()}.png`;
+//                 const filepath = path.join(imagesDir, filename);
+//                 fs.writeFileSync(filepath, buffer);
 
-                // Set accessible image URL
-                result.imageUrl = `/static/images/${filename}`;
-            }
-        }
+//                 // Set accessible image URL
+//                 result.imageUrl = `/static/images/${filename}`;
+//             }
+//         }
 
-        return {
-            success: true,
-            data: result,
-        };
+//         return {
+//             success: true,
+//             data: result,
+//         };
 
-    } catch (error) {
-        console.error("Generation Error:", error);
-        return {
-            success: false,
-            error: error.message,
-        };
-    }
-}
+//     } catch (error) {
+//         console.error("Generation Error:", error);
+//         return {
+//             success: false,
+//             error: error.message,
+//         };
+//     }
+// }
 
 export const styleForEvent = async (req, res) => {
     try {
