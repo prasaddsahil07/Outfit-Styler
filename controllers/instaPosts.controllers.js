@@ -4,7 +4,7 @@ import { searchWithGoogleCustom } from "./product.controllers.js";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-    apiKey: "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",
+    apiKey: process.env(OPENAI_API_KEY),
 });
 
 function extractJsonBlock(text) {
