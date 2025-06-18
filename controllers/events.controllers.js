@@ -215,7 +215,6 @@ export const deleteEvent = async (req, res) => {
 
         return res.status(200).json({ 
             message: 'Event deleted successfully',
-            deletedEventId: id 
         });
     } catch (error) {
         console.error('Error deleting event:', error);
