@@ -1,6 +1,6 @@
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { Router } from "express";
-import { registerUser, loginUser, logoutUser, getUserProfile, changeUserPassword, updateUserProfile, refreshAccessToken } from "../controllers/users.controllers.js";
+import { registerUser, loginUser, logoutUser, getUserProfile, changeUserPassword, updateUserProfile, refreshAccessToken, getUserFullName } from "../controllers/users.controllers.js";
 import {upload} from "../middleware/multer.middleware.js";
 
 const router = Router();
@@ -16,6 +16,8 @@ router.post("/login", loginUser);
 router.post("/logout", verifyJWT, logoutUser);
 // Get user profile
 router.get("/profile", verifyJWT, getUserProfile);
+// Get user fullName
+router.get("/userName", verifyJWT, getUserFullName);
 // Change user password
 router.patch("/change-password", verifyJWT, changeUserPassword);
 // Update user profile

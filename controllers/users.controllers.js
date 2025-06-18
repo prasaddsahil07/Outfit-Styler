@@ -203,6 +203,17 @@ export const getUserProfile = async (req, res) => {
     }
 }
 
+// get userName
+export const getUserFullName = async (req, res) => {
+    try {
+        const user = req.user;
+        const userName = user.fullName;
+        return res.status(200).json({ data: userName });
+    } catch (error) {
+        return res.status(500).json({ msg: "Something went wrong while fetching user name" });
+    }
+}
+
 // update user profile
 export const updateUserProfile = async (req, res) => {
     try {

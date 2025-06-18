@@ -1,9 +1,9 @@
 import { Event } from '../models/events.models.js';
-import { ai } from "../index.js";
-import { Modality } from "@google/genai";
-import path from "path";
-import fs from "fs";
-import {User} from "../models/users.models.js";
+// import { ai } from "../index.js";
+// import { Modality } from "@google/genai";
+// import path from "path";
+// import fs from "fs";
+// import { User } from "../models/users.models.js";
 
 export const addEvent = async (req, res) => {
     const user = req.user;
@@ -19,7 +19,8 @@ export const addEvent = async (req, res) => {
             start_date,
             end_date,
             is_multi_day,
-            event_type,
+            event_name,        // For multi-day events (top-level eventName)
+            // event_type,        // For single-day events (but not stored as eventName anymore)
             time,
             location,
             description,
@@ -40,43 +41,66 @@ export const addEvent = async (req, res) => {
 
         if (is_multi_day) {
             // Handle multi-day event
+            eventData.eventName = event_name; // Set top-level eventName for multi-day events
             eventData.daySpecificData = Object.entries(day_specific_data).map(([dateStr, data]) => ({
                 date: new Date(dateStr),
-                eventType: data.event,
-                startTime: data.time,
+                eventName: data.event,
+                eventTime: data.time,
                 location: data.location,
                 description: data.description,
                 reminder: {
                     value: data.reminderValue,
                     type: data.reminderType,
-                    text: data.reminder
+                    text: data.reminder,
+                    isSent: false
                 }
             }));
         } else {
             // Handle single-day event
-            eventData.eventType = event_type;
-            eventData.startTime = time;
+            // Note: eventName is NOT set for single-day events as per updated schema
+            eventData.eventTime = time;
             eventData.location = location;
             eventData.description = description;
             eventData.reminder = {
                 value: reminder_value,
                 type: reminder_type,
-                text: reminder
+                text: reminder,
+                isSent: false
             };
         }
 
         const event = new Event(eventData);
         await event.save();
-        res.status(201).json(event);
+        
+        res.status(201).json({
+            message: 'Event created successfully',
+            event: event
+        });
     } catch (error) {
+        console.error('Error creating event:', error);
         res.status(400).json({ error: error.message });
     }
 };
 
-
 export const updateEvent = async (req, res) => {
     const { id } = req.params;
-    const { name, date, dayTime, occasion, isStyled, description, generatedImages, reminders } = req.body;
+    const {
+        title,
+        occasion,
+        start_date,
+        end_date,
+        is_multi_day,
+        event_type,
+        time,
+        location,
+        description,
+        reminder,
+        reminder_value,
+        reminder_type,
+        day_specific_data,
+        isStyled,
+        generatedImages
+    } = req.body;
 
     try {
         const event = await Event.findById(id);
@@ -88,35 +112,80 @@ export const updateEvent = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized to update this event' });
         }
 
+        // Base event data update
         const updatedFields = {
-            name,
-            date,
-            dayTime,
-            occasion,
-            isStyled,
-            description,
-            generatedImages
+            title: title || event.title,
+            occasion: occasion || event.occasion,
+            startDate: start_date ? new Date(start_date) : event.startDate,
+            endDate: end_date ? new Date(end_date) : event.endDate,
+            isMultiDay: is_multi_day !== undefined ? is_multi_day : event.isMultiDay,
+            isStyled: isStyled !== undefined ? isStyled : event.isStyled,
+            generatedImages: generatedImages || event.generatedImages
         };
 
-        if (reminders) {
-            updatedFields.reminders = reminders.map(r => ({
-                timeBefore: r.timeBefore,
-                isSent: false // Reset reminders on update
-            }));
+        // Handle event type specific updates
+        if (updatedFields.isMultiDay) {
+            // Update multi-day event data
+            if (day_specific_data) {
+                updatedFields.daySpecificData = Object.entries(day_specific_data).map(([dateStr, data]) => ({
+                    date: new Date(dateStr),
+                    eventName: data.event,
+                    eventTime: data.time,
+                    location: data.location,
+                    description: data.description,
+                    reminder: {
+                        value: data.reminderValue,
+                        type: data.reminderType,
+                        text: data.reminder,
+                        isSent: false // Reset reminder status on update
+                    }
+                }));
+            }
+            
+            // Clear single-day fields for multi-day events
+            updatedFields.eventName = undefined;
+            updatedFields.eventTime = undefined;
+            updatedFields.location = undefined;
+            updatedFields.description = undefined;
+            updatedFields.reminder = undefined;
+        } else {
+            // Update single-day event data
+            updatedFields.eventName = event_type || event.eventName;
+            updatedFields.eventTime = time || event.eventTime;
+            updatedFields.location = location || event.location;
+            updatedFields.description = description || event.description;
+            
+            if (reminder || reminder_value || reminder_type) {
+                updatedFields.reminder = {
+                    value: reminder_value || event.reminder?.value || 1,
+                    type: reminder_type || event.reminder?.type || 'Days before',
+                    text: reminder || event.reminder?.text || '1 day before',
+                    isSent: false // Reset reminder status on update
+                };
+            }
+            
+            // Clear multi-day fields for single-day events
+            updatedFields.daySpecificData = [];
         }
 
-        const updatedEvent = await Event.findByIdAndUpdate(id, updatedFields, { new: true });
+        const updatedEvent = await Event.findByIdAndUpdate(id, updatedFields, { 
+            new: true,
+            runValidators: true 
+        });
 
         if (!updatedEvent) {
-            return res.status(404).json({ message: 'Event not found' });
+            return res.status(404).json({ message: 'Event not found after update' });
         }
 
-        res.status(200).json({ message: 'Event updated successfully', event: updatedEvent });
+        res.status(200).json({ 
+            message: 'Event updated successfully', 
+            event: updatedEvent 
+        });
     } catch (error) {
+        console.error('Error updating event:', error);
         res.status(500).json({ message: 'Error updating event', error: error.message });
     }
 };
-
 
 export const deleteEvent = async (req, res) => {
     const { id } = req.params;
@@ -134,41 +203,112 @@ export const deleteEvent = async (req, res) => {
         // Delete the event
         await Event.findByIdAndDelete(id);
 
-        // Remove the event reference from the user's events array
-        await User.findByIdAndUpdate(event.userId, {
-            $pull: { events: id }
-        });
+        // Remove the event reference from the user's events array if you have one
+        // try {
+        //     await User.findByIdAndUpdate(event.userId, {
+        //         $pull: { events: id }
+        //     });
+        // } catch (userUpdateError) {
+        //     console.warn('Could not update user events array:', userUpdateError.message);
+        //     // Continue with successful event deletion even if user update fails
+        // }
 
-        return res.status(200).json({ message: 'Event deleted successfully' });
+        return res.status(200).json({ 
+            message: 'Event deleted successfully',
+            deletedEventId: id 
+        });
     } catch (error) {
+        console.error('Error deleting event:', error);
         return res.status(500).json({ message: 'Error deleting event', error: error.message });
     }
 };
 
-export const fetchAllEvents = async (req, res) => {
-    try {
-        const user = req.user;
-        if (!user) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
+// export const fetchAllEvents = async (req, res) => {
+//     try {
+//         const user = req.user;
+//         if (!user) {
+//             return res.status(401).json({ message: 'Unauthorized' });
+//         }
 
-        const events = await Event.find({ userId: user._id });
+//         // Add query parameters for filtering
+//         const { 
+//             startDate, 
+//             endDate, 
+//             occasion, 
+//             isMultiDay,
+//             page = 1,
+//             limit = 50
+//         } = req.query;
 
-        if (!events || events.length === 0) {
-            return res.status(404).json({ message: 'No events found' });
-        }
+//         let query = { userId: user._id };
 
-        return res.status(200).json({ message: 'Events fetched successfully', events });
-    } catch (error) {
-        console.error("Error fetching events:", error.message);
-        return res.status(500).json({ message: 'Error fetching events', error: error.message });
-    }
-};
+//         // Add filters if provided
+//         if (startDate || endDate) {
+//             query.startDate = {};
+//             if (startDate) query.startDate.$gte = new Date(startDate);
+//             if (endDate) query.startDate.$lte = new Date(endDate);
+//         }
+
+//         if (occasion) {
+//             query.occasion = { $regex: occasion, $options: 'i' };
+//         }
+
+//         if (isMultiDay !== undefined) {
+//             query.isMultiDay = isMultiDay === 'true';
+//         }
+
+//         const skip = (parseInt(page) - 1) * parseInt(limit);
+
+//         const events = await Event.find(query)
+//             .sort({ startDate: 1 }) // Sort by start date ascending
+//             .skip(skip)
+//             .limit(parseInt(limit));
+
+//         const totalEvents = await Event.countDocuments(query);
+
+//         if (!events || events.length === 0) {
+//             return res.status(200).json({ 
+//                 message: 'No events found',
+//                 events: [],
+//                 pagination: {
+//                     currentPage: parseInt(page),
+//                     totalPages: 0,
+//                     totalEvents: 0,
+//                     hasNextPage: false,
+//                     hasPrevPage: false
+//                 }
+//             });
+//         }
+
+//         const totalPages = Math.ceil(totalEvents / parseInt(limit));
+
+//         return res.status(200).json({ 
+//             message: 'Events fetched successfully', 
+//             events,
+//             pagination: {
+//                 currentPage: parseInt(page),
+//                 totalPages,
+//                 totalEvents,
+//                 hasNextPage: parseInt(page) < totalPages,
+//                 hasPrevPage: parseInt(page) > 1
+//             }
+//         });
+//     } catch (error) {
+//         console.error("Error fetching events:", error.message);
+//         return res.status(500).json({ message: 'Error fetching events', error: error.message });
+//     }
+// };
 
 export const getEventDetails = async (req, res) => {
     try {
         const { id } = req.params;
+        
+        if (!id) {
+            return res.status(400).json({ message: 'Event ID is required' });
+        }
+
         const eventDetails = await Event.findById(id);
+        
         if (!eventDetails) {
             return res.status(404).json({ message: 'Event not found' });
         }
@@ -177,12 +317,83 @@ export const getEventDetails = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized to view this event' });
         }
 
-        return res.status(200).json({ message: 'Event details fetched successfully', event: eventDetails });
+        return res.status(200).json({ 
+            message: 'Event details fetched successfully', 
+            event: eventDetails 
+        });
     } catch (error) {
-        console.log("error : ", error.message);
+        console.error("Error fetching event details:", error.message);
         return res.status(500).json({ message: 'Error fetching event details', error: error.message });
     }
 };
+
+export const getUpcomingEvents = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        // const { limit = 10 } = req.query;
+        const currentDate = new Date();
+
+        const upcomingEvents = await Event.find({
+            userId: user._id,
+            startDate: { $gte: currentDate }
+        })
+        .sort({ startDate: 1 });
+        // .limit(parseInt(limit));
+
+        return res.status(200).json({
+            message: 'Upcoming events fetched successfully',
+            events: upcomingEvents
+        });
+    } catch (error) {
+        console.error("Error fetching upcoming events:", error.message);
+        return res.status(500).json({ message: 'Error fetching upcoming events', error: error.message });
+    }
+};
+
+// export const markReminderAsSent = async (req, res) => {
+//     try {
+//         const { eventId } = req.params;
+//         const { dayDate } = req.body; // For multi-day events
+
+//         const event = await Event.findById(eventId);
+        
+//         if (!event) {
+//             return res.status(404).json({ message: 'Event not found' });
+//         }
+
+//         if (event.userId.toString() !== req.user._id.toString()) {
+//             return res.status(403).json({ message: 'Unauthorized' });
+//         }
+
+//         if (event.isMultiDay && dayDate) {
+//             // Mark specific day reminder as sent
+//             const dayIndex = event.daySpecificData.findIndex(
+//                 day => day.date.toISOString().split('T')[0] === new Date(dayDate).toISOString().split('T')[0]
+//             );
+            
+//             if (dayIndex !== -1) {
+//                 event.daySpecificData[dayIndex].reminder.isSent = true;
+//             }
+//         } else {
+//             // Mark single-day event reminder as sent
+//             event.reminder.isSent = true;
+//         }
+
+//         await event.save();
+
+//         return res.status(200).json({
+//             message: 'Reminder marked as sent',
+//             event
+//         });
+//     } catch (error) {
+//         console.error("Error marking reminder as sent:", error.message);
+//         return res.status(500).json({ message: 'Error updating reminder status', error: error.message });
+//     }
+// };
 
 
 // function buildOutfitPrompt(occasion, dayTime, description, userBodyInfo) {
@@ -281,55 +492,55 @@ export const getEventDetails = async (req, res) => {
 //     }
 // }
 
-export const styleForEvent = async (req, res) => {
-    try {
-        const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found' });
-        }
+// export const styleForEvent = async (req, res) => {
+//     try {
+//         const event = await Event.findById(req.params.id);
+//         if (!event) {
+//             return res.status(404).json({ message: 'Event not found' });
+//         }
 
-        const userId = req.user._id;
-        // Check if the user is authorized to style this event
-        if(event.userId.toString() !== userId.toString()) {
-            return res.status(403).json({ message: 'Unauthorized to style this event' });
-        }
+//         const userId = req.user._id;
+//         // Check if the user is authorized to style this event
+//         if(event.userId.toString() !== userId.toString()) {
+//             return res.status(403).json({ message: 'Unauthorized to style this event' });
+//         }
 
-        const userBodyInfo = req.user.userBodyInfo;
+//         const userBodyInfo = req.user.userBodyInfo;
 
-        // fetch user body data here to give more personalized outfit
+//         // fetch user body data here to give more personalized outfit
 
-        if (!event.isStyled || !event.generatedImages || event.generatedImages.length === 0) {
-            const genResult = await generateOutfitAsPerRequirements(
-                event.occasion,
-                event.dayTime,
-                event.description,
-                userBodyInfo
-            );
+//         if (!event.isStyled || !event.generatedImages || event.generatedImages.length === 0) {
+//             const genResult = await generateOutfitAsPerRequirements(
+//                 event.occasion,
+//                 event.dayTime,
+//                 event.description,
+//                 userBodyInfo
+//             );
 
-            // console.log("GEN RESULT:", genResult);
+//             // console.log("GEN RESULT:", genResult);
 
-            if (!genResult.success || !genResult.data?.imageUrl) {
-                return res.status(500).json({ message: 'Error generating outfit' });
-            }
+//             if (!genResult.success || !genResult.data?.imageUrl) {
+//                 return res.status(500).json({ message: 'Error generating outfit' });
+//             }
 
-            // Save the image as base64 or link to image hosting
-            event.isStyled = true;
-            event.generatedImages = [genResult.data.imageUrl];
-            await event.save();
+//             // Save the image as base64 or link to image hosting
+//             event.isStyled = true;
+//             event.generatedImages = [genResult.data.imageUrl];
+//             await event.save();
 
-            return res.status(200).json({
-                message: 'Event styled successfully',
-                description: genResult.data.textDescription,
-                images: event.generatedImages,
-            });
-        }
+//             return res.status(200).json({
+//                 message: 'Event styled successfully',
+//                 description: genResult.data.textDescription,
+//                 images: event.generatedImages,
+//             });
+//         }
 
-        return res.status(200).json({
-            message: 'Event already styled',
-            images: event.generatedImages,
-        });
-    } catch (error) {
-        console.error("Error styling event:", error.message);
-        return res.status(500).json({ message: 'Error styling event', error: error.message });
-    }
-};
+//         return res.status(200).json({
+//             message: 'Event already styled',
+//             images: event.generatedImages,
+//         });
+//     } catch (error) {
+//         console.error("Error styling event:", error.message);
+//         return res.status(500).json({ message: 'Error styling event', error: error.message });
+//     }
+// };

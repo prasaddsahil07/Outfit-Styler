@@ -10,12 +10,12 @@ const eventSchema = new mongoose.Schema({
     // Multi-day event support
     isMultiDay: { type: Boolean, default: false },
     
-    // Single-day event fields (required only for single-day events)
-    eventType: { 
+    // Single-day event fields (required only for multi-day events)
+    eventName: { 
         type: String, 
-        required: function() { return !this.isMultiDay; } 
+        required: function() { return this.isMultiDay; } 
     },
-    startTime: { 
+    eventTime: { 
         type: String, 
         required: function() { return !this.isMultiDay; } 
     },
@@ -40,8 +40,8 @@ const eventSchema = new mongoose.Schema({
     // Multi-day event data (array of day-specific plans)
     daySpecificData: [{
         date: { type: Date, required: true },
-        eventType: { type: String, required: true },
-        startTime: { type: String, required: true },
+        eventName: { type: String, required: true },
+        eventTime: { type: String, required: true },
         location: { type: String, required: true },
         description: { type: String },
         reminder: {
@@ -59,7 +59,15 @@ const eventSchema = new mongoose.Schema({
     // Styling and media
     isStyled: { type: Boolean, default: false },
     generatedImages: [{ type: String }],
-    timezone: { type: String, default: 'UTC' }
+    // timezone: { type: String, default: 'UTC' }
+     // TTL field for automatic deletion
+    expiresAt: { 
+        type: Date, 
+        default: function() {
+            // Delete 1 days after end date (adjust as needed)
+            return new Date(this.endDate.getTime() + (1 * 24 * 60 * 60 * 1000));
+        }
+    }
 }, {timestamps: true});
 
 

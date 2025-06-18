@@ -50,10 +50,10 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'SavedImage'
     }],
-    events:[{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Event'
-    }],
+    // events:[{
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'Event'
+    // }],
     refreshToken:{
         type:String
     }
