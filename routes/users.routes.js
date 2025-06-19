@@ -6,10 +6,12 @@ import {upload} from "../middleware/multer.middleware.js";
 const router = Router();
 
 // Register a new user
-router.post("/register", upload.fields([{
-    name: 'profilePicture',
-    maxCount: 1
-}]), registerUser);
+// router.post("/register", upload.fields([{
+//     name: 'profilePicture',
+//     maxCount: 1
+// }]), registerUser);
+
+router.post("/register", registerUser);
 // Login a user
 router.post("/login", loginUser);
 // Logout a user

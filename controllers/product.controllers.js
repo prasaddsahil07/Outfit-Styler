@@ -59,7 +59,7 @@ const performGoogleCustomSearchWithRetry = async (query, retryCount = 0) => {
           key: GOOGLE_API_KEY,
           cx: GOOGLE_CSE_ID,
           q: query,
-          num: 3, // Get more results per request to maximize efficiency
+          num: 10, // Get more results per request to maximize efficiency
         },
         timeout: 10000, // 10 second timeout
       }

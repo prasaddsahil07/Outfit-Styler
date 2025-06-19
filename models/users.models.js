@@ -1,63 +1,106 @@
-import mongoose from "mongoose"
-import jwt from "jsonwebtoken"
-import bcrypt from 'bcrypt'
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from 'bcrypt';
 
-const userSchema = new mongoose.Schema({
-    username:{
-        type:String,
-        required:true,
-        unique: true,
-        lowercase: true,
-        trim:true,
-        index:true
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+      match: [
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        "Please enter a valid email",
+      ],
     },
-    email:{
-        type:String,
-        required:true,
-        unique: true,
-        lowercase: true,
-        trim:true,
+    fullName: {
+      type: String,
+      required: true,
+      minlength: [2, "Username must be at least 3 characters"],
+      maxlength: [20, "Username cannot exceed 20 characters"],
     },
-    fullName:{
-        type:String,
-        required:true,
-        trim:true,
-        index:true
+    password: {
+      type: String,
+      required: [true, "Password is required!"],
+      minlength: [3, "Password must be at least 6 characters"],
     },
-    phone:{
-        type:String,
-        required:true,
-        unique: true,
-        trim:true,
-        index:true
+    userBodyInfo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UserBodyInfo",
     },
-    password:{
-        type:String,
-        required:[true, 'Password is required!']
-    },
-    profilePicture:{
-        type: String,   
-    },
-    wardrobe: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'DigitalWardrobe'
-    },
-    userBodyInfo : {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'UserBodyInfo'
-    },
-    savedImages: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'SavedImage'
-    }],
-    // events:[{
+    // events: [
+    //   {
     //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'Event'
-    // }],
-    refreshToken:{
-        type:String
-    }
-},{timestamps:true})
+    //     ref: "Event",
+    //   },
+    // ],
+    refreshToken: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+);
+
+
+// const userSchema = new mongoose.Schema({
+//     username:{
+//         type:String,
+//         required:true,
+//         unique: true,
+//         lowercase: true,
+//         trim:true,
+//         index:true
+//     },
+//     email:{
+//         type:String,
+//         required:true,
+//         unique: true,
+//         lowercase: true,
+//         trim:true,
+//     },
+//     fullName:{
+//         type:String,
+//         required:true,
+//         trim:true,
+//         index:true
+//     },
+//     phone:{
+//         type:String,
+//         required:true,
+//         unique: true,
+//         trim:true,
+//         index:true
+//     },
+//     password:{
+//         type:String,
+//         required:[true, 'Password is required!']
+//     },
+//     profilePicture:{
+//         type: String,   
+//     },
+//     wardrobe: {
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: 'DigitalWardrobe'
+//     },
+//     userBodyInfo : {
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: 'UserBodyInfo'
+//     },
+//     savedImages: [{
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: 'SavedImage'
+//     }],
+//     // events:[{
+//     //     type: mongoose.Schema.Types.ObjectId,
+//     //     ref: 'Event'
+//     // }],
+//     refreshToken:{
+//         type:String
+//     }
+// },{timestamps:true})
 
 userSchema.pre("save", async function (next) {          // pre is a mongoose hook
     if(!this.isModified("password")) return next();     // only if password field is modified then only pass to next
