@@ -31,12 +31,6 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserBodyInfo",
     },
-    // events: [
-    //   {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: "Event",
-    //   },
-    // ],
     refreshToken: {
       type: String,
     },

@@ -528,44 +528,45 @@ app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) =>
     }
 });
 
+
 // Function to extract clothing metadata using Gemini API
 export async function extractClothingMetadata(base64Image, mimetype) {
     try {
         const prompt = `
-            You are a fashion expert AI. Analyze the given image, which may contain either:
-            - A single dress
-            - A combination of topwear and bottomwear
+You are a fashion analysis AI. Given a clothing image (either a single dress or a topwear + bottomwear combination), return a JSON array of 1–2 objects with the following strict structure:
 
-            Return the extracted metadata in this format:
+[
+  {
+    "itemName": "e.g. Floral Crop Top",
+    "category": one of the following: "Tops", "Bottoms", "Dresses", "Ethnic", "Swimwear", "Footwear", "Accessories", "co-ord set",
+    "color": {
+      "name": readable color name (e.g. "Beige", "Navy Blue"),
+      "hex": corresponding hex code (e.g. "#F5F5DC", "#000080")
+    },
+    "fabric": one open-ended tag like "Silk" — must be relevant to usage,
+    "occasion": up to 3 open-ended tags like ["Party", "Work", "Travel"] — must be lowercase and relevant to usage,
+    "season": pick 1–2 from: "Summer", "Winter", "Monsoon", "Autumn", "Spring", "All Season"
+  }
+]
 
-            [
-                {
-                    "category": "topwear | bottomwear | dress",
-                    "color": "e.g. Beige, Navy Blue",
-                    "fabric": "e.g. Cotton, Denim, Silk, Wool, etc.",
-                    "pattern": "e.g. Solid, Striped, Floral, Checkered, etc.",
-                    "ai_tags": ["e.g. Stylish", "Comfortable", "Formal", "Trendy"],
-                    "occasion": ["e.g. Casual", "Work", "Party", "Ethnic", "Gym"],
-                    "season": ["e.g. Summer", "Winter", "Monsoon", "All-Season"]
-                }
-            ]
-
-            Guidelines:
-            - Always return an array with one or two objects (depending on how many distinct garments are visible).
-            - Use the best possible educated guess based on visual cues.
-            - Never return null or unknown values.
-            `;
-
+Rules:
+- Return exactly 1 or 2 garments depending on the image.
+- Only return valid enums for category, fabric, and season.
+- Do not invent or guess values outside these enums.
+- color must include both a human-readable name and a hex code.
+- Never return null, undefined, empty strings, or invalid fields.
+- Do not include any explanation, comment, or markdown — just the pure JSON array.
+        `.trim();
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash-exp",
             contents: [{
                 parts: [
                     { text: prompt },
-                    { 
-                        inlineData: { 
+                    {
+                        inlineData: {
                             mimeType: mimetype || "image/jpeg",
-                            data: base64Image 
+                            data: base64Image
                         }
                     }
                 ]
@@ -575,7 +576,6 @@ export async function extractClothingMetadata(base64Image, mimetype) {
             }
         });
 
-        // Extract and clean JSON response
         const textResponse = response.candidates[0]?.content?.parts?.[0]?.text || '';
         const jsonString = textResponse
             .replace(/^```json|```$/g, '')
@@ -585,22 +585,14 @@ export async function extractClothingMetadata(base64Image, mimetype) {
         if (!jsonString) throw new Error('Empty response from Gemini');
 
         const parsedMetadata = JSON.parse(jsonString);
-
-        // Validate required fields
-        // const requiredFields = ['category', 'itemCategories', 'fabrics', 'occasions', 'seasons', 'colors', 'pattern', 'style'];
-        // for (const field of requiredFields) {
-        //     if (!parsedMetadata[field]) {
-        //         throw new Error(`Missing required field: ${field}`);
-        //     }
-        // }
-
         return parsedMetadata;
 
     } catch (error) {
         console.error('Metadata extraction error:', error);
-        return getFallbackMetadata();
+        throw new Error('Strict metadata extraction failed. Make sure the image is valid and well-lit.');
     }
 }
+
 
 // Function to exctract complementary item metadata using Gemini API
 export async function extractComplementaryClothMetaData(base64Image, occasion, preservedType, mimetype) {

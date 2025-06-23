@@ -210,15 +210,15 @@ eventSchema.pre('save', function(next) {
         };
         
         // Validate that all day events fall within the date range
-        if (this.daySpecificData && this.daySpecificData.length > 0) {
-            const invalidDates = this.daySpecificData.filter(dayEvent => 
-                dayEvent.date < this.startDate || dayEvent.date > this.endDate
-            );
+        // if (this.daySpecificData && this.daySpecificData.length > 0) {
+        //     const invalidDates = this.daySpecificData.filter(dayEvent => 
+        //         dayEvent.date < this.startDate || dayEvent.date > this.endDate
+        //     );
             
-            if (invalidDates.length > 0) {
-                return next(new Error('All day events must fall within the event date range'));
-            }
-        }
+        //     if (invalidDates.length > 0) {
+        //         return next(new Error('All day events must fall within the event date range'));
+        //     }
+        // }
     }
     
     next();
