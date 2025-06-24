@@ -1,7 +1,7 @@
 import { uploadAndValidateImages } from "../services/fashionValidator.js";
 import { getOutfitCritique } from "../services/outfitCritique.js";
 import { generateMannequinImage } from "../services/mannequinGenerator.js";
-import { deleteFromCloudinary } from "../utils/cloudinary.js";
+// import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 export const styleRecommenderController = async (req, res) => {
     try {

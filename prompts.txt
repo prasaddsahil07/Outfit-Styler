@@ -52,10 +52,10 @@ The final output must look like a single professional fashion flatlay styled aro
 
 
 const prompt = `
-👗 ROLE: You are a professional fashion stylist creating a single, full-body styled outfit for a fashion editorial campaign using a real uploaded item.
+ROLE: You are a professional fashion stylist creating a single, full-body styled outfit for a fashion editorial campaign using a real uploaded item.
 
-🎯 OBJECTIVE:
-Design **Look ${i + 1} of 3** for a **${occasion}** setting and ${weather}. You must build a single cohesive outfit centered around the uploaded **${clothingType}**, styled on a model for a fashion campaign.
+OBJECTIVE:
+Design **Look ${i + 1} of 3** for an **${occasion}** setting and ${weather}. You must build a single cohesive outfit centered around the uploaded **${clothingType}**, styled on a model for a fashion campaign.
 
 🚫 IMAGE INTEGRITY RULES – CRITICAL:
 - The uploaded garment is a real photo and must appear **EXACTLY as provided**.

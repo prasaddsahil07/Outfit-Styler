@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { connectDB } from "./db/connectDB.js";
+import OpenAI from "openai";
 import cors from "cors";
 // import { PythonShell } from "python-shell";
 // import { updateCache } from "./controllers/homeScreen.controllers.js";
@@ -31,6 +32,7 @@ dotenv.config();
 await connectDB();
 
 export const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 job.start();
 
@@ -49,7 +51,7 @@ const __dirname = path.dirname(__filename);
 // Create /tmp dir if it doesn't exist
 const tmpPath = path.join(__dirname, "tmp");
 if (!fs.existsSync(tmpPath)) {
-  fs.mkdirSync(tmpPath);
+    fs.mkdirSync(tmpPath);
 }
 
 app.use("/upload", imageRoute);
@@ -81,224 +83,8 @@ app.use("/api/styleRecommender", styleRecommenderRoute);
 // updateCache();
 // setInterval(updateCache,  60 * 60 * 1000); // Every 12 hours
 
-// app.post('/api/process-garment', upload.single('image'), async (req, res) => {
-//     const category = req.body.category;
-
-//     if (!req.file || !category) {
-//         return res.status(400).json({ error: "Image and category are required" });
-//     }
-
-//     const options = {
-//         mode: 'json',
-//         pythonPath: 'python',
-//         pythonOptions: ['-u'],
-//         scriptPath: __dirname
-//     };
-
-//     const pyshell = new PythonShell('clip_script.py', options);
-
-//     pyshell.on('error', (err) => {
-//         console.error('PythonShell Error:', err);
-//         return res.status(500).json({ error: "Python script failed" });
-//     });
-
-
-//     const payload = {
-//         image: req.file.buffer.toString('base64'),
-//         category
-//     };
-
-//     let resultData = '';
-
-//     pyshell.on('message', (message) => {
-//         resultData += JSON.stringify(message);
-//     });
-
-//     pyshell.send(payload);
-
-//     pyshell.end((err) => {
-//         if (err) return res.status(500).json({ error: err.message });
-
-//         try {
-//             const parsed = JSON.parse(resultData);
-//             if (parsed.error) {
-//                 return res.status(500).json({ error: parsed.error });
-//             }
-//             res.json(parsed);
-//         } catch (parseErr) {
-//             res.status(500).json({ error: "Invalid response from Python script" });
-//         }
-//     });
-// });
-
-// IP-Adapter processing endpoint
-// app.post('/api/style-outfits', upload.single('image'), async (req, res) => {
-//     if (!req.file) {
-//         return res.status(400).json({ error: "Image is required" });
-//     }
-
-//     const options = {
-//         mode: 'json',
-//         pythonPath: 'python',
-//         scriptPath: path.join(__dirname, 'python_scripts'),
-//         pythonOptions: ['-u'],
-//         args: []
-//     };
-
-//     try {
-//         const results = await new Promise((resolve, reject) => {
-//             const pyshell = new PythonShell('ip_adapter_processor.py', options);
-
-//             let output = [];
-//             pyshell.on('message', (message) => {
-//                 output.push(message);
-//             });
-
-//             pyshell.send(req.file.buffer.toString('base64'));
-
-
-//             pyshell.end((err) => {
-//                 if (err) reject(err);
-//                 resolve(output);
-//             });
-//         });
-
-//         res.json({
-//             original_image: `data:image/png;base64,${req.file.buffer.toString('base64')}`,
-//             styled_outfits: results
-//         });
-//     } catch (error) {
-//         res.status(500).json({ error: error.message });
-//     }
-// });
-
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "landing.html"));
-});
-
-app.get("/api/closet/:weather", (req, res) => {
-    const weather = req.params.weather.toLowerCase();
-    const dirPath = path.join(__dirname, "public", "closet", `${weather}_collection`);
-
-    try {
-        const files = fs.readdirSync(dirPath);
-        const imageFiles = files.filter(file => file.endsWith(".jpg"));
-        res.json(imageFiles);
-    } catch (err) {
-        console.error("Directory read error:", err);
-        res.status(500).json({ error: "Failed to read directory" });
-    }
-});
-
-app.get("/get-my-wardrobe", async (req, res) => {
-    try {
-        const folders = ['topwear', 'bottomwear'];
-        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
-        const occasionsSet = new Set();
-        const fabricSet = new Set();
-
-        folders.forEach(folder => {
-            const folderPath = path.join(baseDir, folder);
-            const files = fs.readdirSync(folderPath);
-
-            files.forEach(file => {
-                if (file.endsWith('.json')) {
-                    const metadata = JSON.parse(fs.readFileSync(path.join(folderPath, file), 'utf-8'));
-
-                    // console.log("Parsed metadata:", metadata);
-
-                    const occasions = metadata.occasions;
-
-                    if (Array.isArray(occasions)) {
-                        occasions.forEach(o => occasionsSet.add(o.toLowerCase()));
-                    } else if (typeof occasions === 'object' && occasions !== null) {
-                        Object.values(occasions).forEach(arr => {
-                            arr.forEach(o => occasionsSet.add(o.toLowerCase()));
-                        });
-                    }
-
-                    const fabrics = metadata.fabrics;
-
-                    if (Array.isArray(fabrics)) {
-                        fabrics.forEach(o => fabricSet.add(o.toLowerCase()));
-                    } else if (typeof fabrics === 'object' && fabrics !== null) {
-                        Object.values(fabrics).forEach(arr => {
-                            arr.forEach(o => fabricSet.add(o.toLowerCase()));
-                        });
-                    }
-
-                }
-            });
-
-        });
-
-        res.json({ occasions: Array.from(occasionsSet), fabrics: Array.from(fabricSet) });
-    } catch (error) {
-        // console.error("Error fetching wardrobe occasions:", error);
-        res.status(500).json({ error: "Failed to fetch wardrobe data" });
-    }
-});
-
-app.get("/filter-wardrobe", async (req, res) => {
-    try {
-        const { title, type } = req.query;
-
-        if (!title || !type) {
-            return res.status(400).json({ error: "Missing title or type in query" });
-        }
-
-        const collections = [];
-        const folders = ['topwear', 'bottomwear'];
-        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
-
-        folders.forEach(folder => {
-            const folderPath = path.join(baseDir, folder);
-            const files = fs.readdirSync(folderPath);
-
-            files.forEach(file => {
-                if (file.endsWith('.json')) {
-                    const metadataPath = path.join(folderPath, file);
-                    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-
-                    let matchFound = false;
-
-                    if (title in metadata) {
-                        const field = metadata[title];
-
-                        // Handle array directly (like ["Work", "Party"])
-                        if (Array.isArray(field)) {
-                            matchFound = field.map(f => f.toLowerCase()).includes(type.toLowerCase());
-                        }
-
-                        // Handle nested object (like for "occasions": { topwear: [...], bottomwear: [...] })
-                        else if (typeof field === 'object' && field !== null) {
-                            Object.values(field).forEach(arr => {
-                                if (Array.isArray(arr) && arr.map(f => f.toLowerCase()).includes(type.toLowerCase())) {
-                                    matchFound = true;
-                                }
-                            });
-                        }
-
-                        // Handle simple string field (e.g., pattern: "Striped")
-                        else if (typeof field === 'string') {
-                            matchFound = field.toLowerCase() === type.toLowerCase();
-                        }
-                    }
-
-                    if (matchFound) {
-                        const imageFilename = file.replace('.json', '.jpg'); // assuming JPG images
-                        const imagePath = `/uploads/wardrobe/${folder}/${imageFilename}`;
-                        collections.push(imagePath);
-                    }
-                }
-            });
-        });
-
-        res.json({ results: collections });
-    } catch (error) {
-        console.error("Error filtering wardrobe:", error);
-        res.status(500).json({ error: "Failed to filter wardrobe" });
-    }
 });
 
 app.post("/generate-image", upload.single("image"), async (req, res) => {
@@ -337,7 +123,7 @@ The goal is to showcase styling versatility by creating three distinct aesthetic
 `;
 
 
-    const prompt1 = `Take the uploaded image and mask all the items present (e.g., clothes, accessories, shoes, bags). Create a new image where these items are cleanly extracted and arranged together in a flatlay style — like how items are laid out on Pinterest fashion boards.
+        const prompt1 = `Take the uploaded image and mask all the items present (e.g., clothes, accessories, shoes, bags). Create a new image where these items are cleanly extracted and arranged together in a flatlay style — like how items are laid out on Pinterest fashion boards.
 
 The background should be neutral (light gray or beige), and the lighting must be soft and diffused, avoiding harsh shadows. The resulting image should look professionally styled, with a minimalist flatlay aesthetic.
 
@@ -391,6 +177,90 @@ Ensure that the items are clearly visible, properly aligned, and spaced aestheti
     } catch (err) {
         console.error("Generation error:", err.message);
         res.status(500).json({ error: "Image generation failed" });
+    }
+});
+
+app.post("/generateImageForOccasion", async (req, res) => {
+    try {
+        const { occasion } = req.query;
+
+        if (!occasion) {
+            return res.status(400).json({ error: "Missing occasion" });
+        }
+
+        const prompt = `
+ROLE: You are a professional fashion stylist creating complete, full-body styled outfits for a fashion editorial campaign.
+
+OBJECTIVE:
+Design a cohesive outfit perfect for a **${occasion}** setting. Create a single complete look styled on a model for a fashion campaign.
+
+✅ OUTFIT STRUCTURE:
+- Include EXACTLY ONE complete outfit with:
+  - One topwear (shirt, blouse, t-shirt, sweater, etc.)
+  - One bottomwear (pants, skirt, shorts, etc.) OR a dress (if dress, no separate top/bottom needed)
+  - One pair of shoes
+  - 2–3 accessories (bag, hat, jewelry, belt, scarf – choose what fits the occasion)
+- NO duplicates or alternate options – only one complete look
+
+🎨 STYLING FOCUS:
+- The outfit must be appropriate and stylish for **${occasion}**
+- Consider the formality level, color palette, and style that suits this occasion
+- Focus on creating a cohesive, well-coordinated look
+- Ensure all pieces work harmoniously together
+
+🖼️ VISUAL OUTPUT FORMAT:
+- The final outfit should be styled on a photorealistic human **model**
+- Professional editorial photography look – full-body model shot
+- Clean and neutral background, natural light or soft studio lighting
+- High-resolution fashion-forward appearance
+- Show the complete outfit clearly and attractively
+
+🚫 ABSOLUTE RULES:
+- Only ONE complete outfit
+- No styling alternatives or multiple options
+- No text overlays or descriptions on the image
+- Focus on showcasing a realistic, wearable outfit
+
+✨ GOAL:
+Deliver a distinct and editorial-quality complete outfit suitable for the **${occasion}** setting, styled professionally on a model.
+`;
+
+        const results = [];
+
+        // Set responseModalities to include "Image" so the model can generate  an image
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-preview-image-generation",
+            contents: prompt,
+            config: {
+                responseModalities: [Modality.TEXT, Modality.IMAGE],
+                numberOfImages: 3,
+            },
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+            // Based on the part type, either show the text or save the image
+            if (part.text) {
+                console.log(part.text);
+            } else if (part.inlineData) {
+                const imageData = part.inlineData.data;
+                // const buffer = Buffer.from(imageData, "base64");
+                results.push(imageData);
+                console.log("Image saved as gemini-native-image.png");
+            }
+        }
+        
+        return res.status(200).json({
+            message: "Images created successfully",
+            results,
+            occasion: occasion
+        });
+
+    } catch (err) {
+        console.error("Generation error:", err.message);
+        res.status(500).json({
+            error: "Image generation failed",
+            details: err.message
+        });
     }
 });
 
@@ -479,56 +349,6 @@ app.post("/generate-image-from-wardrobe", async (req, res) => {
     }
 });
 
-app.post("/wardrobe/upload", upload.single('clothingImage'), async (req, res) => {
-    let tempFilePath = null;
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No image file uploaded' });
-        }
-
-        // Create temp directory if not exists
-        fs.mkdirSync("temp_uploads", { recursive: true });
-        tempFilePath = path.join("temp_uploads", `${uuidv4()}.jpg`);
-        await fs.promises.writeFile(tempFilePath, req.file.buffer);
-
-        // Convert to base64 and extract metadata
-        const base64Image = req.file.buffer.toString('base64');
-        const metadata = await extractClothingMetadata(base64Image); // Pass only base64 string
-
-        // Validate metadata
-        if (!metadata || typeof metadata !== 'object') {
-            throw new Error('Invalid metadata format received');
-        }
-
-        // Store organized image
-        const savedLocations = await organizeClothingImage(tempFilePath, metadata);
-
-        res.status(200).json({
-            success: true,
-            message: 'Clothing item processed successfully',
-            metadata: metadata,
-            locations: savedLocations
-        });
-    } catch (error) {
-        console.error('Error processing clothing image:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Image processing failed',
-            details: error.message
-        });
-    } finally {
-        // Clean up temp file
-        if (tempFilePath && fs.existsSync(tempFilePath)) {
-            try {
-                await fs.promises.unlink(tempFilePath);
-            } catch (cleanupError) {
-                console.error('Failed to clean up temp file:', cleanupError);
-            }
-        }
-    }
-});
-
-
 // Function to extract clothing metadata using Gemini API
 export async function extractClothingMetadata(base64Image, mimetype) {
     try {
@@ -591,8 +411,7 @@ Rules:
         console.error('Metadata extraction error:', error);
         throw new Error('Strict metadata extraction failed. Make sure the image is valid and well-lit.');
     }
-}
-
+};
 
 // Function to exctract complementary item metadata using Gemini API
 export async function extractComplementaryClothMetaData(base64Image, occasion, preservedType, mimetype) {
@@ -615,7 +434,7 @@ export async function extractComplementaryClothMetaData(base64Image, occasion, p
             }],
             generationConfig: {
                 response_mime_type: "application/json"
-                
+
             }
         });
 
@@ -635,86 +454,7 @@ export async function extractComplementaryClothMetaData(base64Image, occasion, p
         console.error("Error extracting complementary clothing metadata:", error);
         throw error;
     }
-}
-
-// Default metadata for error cases
-function getFallbackMetadata() {
-    return {
-        category: 'Uncategorized',
-        itemCategories: ['Uncategorized'],
-        fabrics: ['Unknown'],
-        occasions: ['Casual'],
-        seasons: ['All Seasons'],
-        colors: ['Unknown'],
-        pattern: 'Unknown',
-        style: 'Unknown',
-        dateAdded: new Date().toISOString()
-    };
-}
-
-// Function to organize the clothing image into topwear and/or bottomwear folders
-async function organizeClothingImage(sourcePath, metadata) {
-    const savedLocations = [];
-
-    try {
-        // Create base directories if they don't exist
-        const baseDir = path.join(__dirname, 'uploads', 'wardrobe');
-        const topwearDir = path.join(baseDir, 'topwear');
-        const bottomwearDir = path.join(baseDir, 'bottomwear');
-
-        fs.mkdirSync(baseDir, { recursive: true });
-        fs.mkdirSync(topwearDir, { recursive: true });
-        fs.mkdirSync(bottomwearDir, { recursive: true });
-
-        // Generate a unique filename for the image
-        const uniqueFilename = `${Date.now()}-${path.basename(sourcePath)}`;
-
-        // Create a JSON metadata file name
-        const metadataFilename = uniqueFilename.replace(/\.[^/.]+$/, '.json');
-
-        // Get the category from metadata
-        const category = metadata.category.toLowerCase();
-
-        const metadataContent = JSON.stringify(metadata, null, 2);
-
-        // Based on the category, save the image to appropriate folders
-        if (category === 'topwear' || category === 'both') {
-            const topwearImagePath = path.join(topwearDir, uniqueFilename);
-            fs.copyFileSync(sourcePath, topwearImagePath);
-
-            const topwearMetadataPath = path.join(topwearDir, metadataFilename);
-            fs.writeFileSync(topwearMetadataPath, metadataContent);
-
-            savedLocations.push({
-                category: 'topwear',
-                imagePath: topwearImagePath,
-                metadataPath: topwearMetadataPath
-            });
-        }
-
-        if (category === 'bottomwear' || category === 'both') {
-            // Save to bottomwear folder
-            const bottomwearImagePath = path.join(bottomwearDir, uniqueFilename);
-            fs.copyFileSync(sourcePath, bottomwearImagePath);
-
-            // Copy metadata to bottomwear folder
-            const bottomwearMetadataPath = path.join(bottomwearDir, metadataFilename);
-            fs.writeFileSync(bottomwearMetadataPath, metadataContent);
-
-            savedLocations.push({
-                category: 'bottomwear',
-                imagePath: bottomwearImagePath,
-                metadataPath: bottomwearMetadataPath
-            });
-        }
-
-        return savedLocations;
-
-    } catch (error) {
-        console.error('Error organizing clothing image:', error);
-        throw new Error(`Failed to organize clothing image: ${error.message}`);
-    }
-}
+};
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
