@@ -10,7 +10,8 @@ import {
   getGarmentsByOccasion, 
   getGarmentsBySeason,
   getGarmentsByColor,
-  getCategoryCounts 
+  getCategoryCounts ,
+  getGarmentDetails
 } from "../controllers/digitalWardrobe.controllers.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -19,6 +20,9 @@ const router = Router();
 
 // Category counts
 router.get("/categoryCounts", verifyJWT, getCategoryCounts);
+
+// get garment detail by id
+router.get("/getDetails/:garmentId", verifyJWT, getGarmentDetails);
 
 // Add garments to wardrobe
 router.post("/addTowardrobe", verifyJWT, upload.array("images", 5), addGarmentToDigitalWardrobe);
