@@ -1,6 +1,3 @@
-import fs from "fs/promises";
-import path from "path";
-import mime from "mime-types";
 import { ai } from "../index.js";
 import { createUserContent, Modality } from "@google/genai";
 
@@ -23,14 +20,30 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-export async function generateMannequinImage(imageUrls, occasion) {
+export async function generateModelImage(imageUrls, occasion) {
   try {
     const [top, bottom, accessory, footwear] = imageUrls;
 
-    const prompt = `You are a fashion stylist AI. Generate a stylish, full-body mannequin image for the occasion: ${occasion}. 
-Include the following items:
-${top ? "- Topwear\n" : ""}${bottom ? "- Bottomwear\n" : ""}${accessory ? "- Accessories\n" : ""}${footwear ? "- Footwear\n" : ""}
-Make the mannequin look elegant, well-dressed, and appropriate for the occasion. Use a neutral background with soft lighting.`;
+    const prompt = `You are an expert fashion stylist AI specializing in creating sophisticated, occasion-appropriate outfits. Generate a high-quality, full-body image of an elegant female model styled for: ${occasion}.
+
+    STYLING REQUIREMENTS:
+    ${top ? "• Top: Select sophisticated topwear that complements the occasion and body silhouette\n" : ""}${bottom ? "• Bottom: Choose well-fitted bottomwear that balances the overall look\n" : ""}${accessory ? "• Accessories: Include tasteful accessories that enhance without overwhelming the outfit\n" : ""}${footwear ? "• Footwear: Select appropriate shoes that complete the ensemble\n" : ""}
+
+    VISUAL SPECIFICATIONS:
+    - Model pose: Confident, natural stance with good posture
+    - Styling: Ensure proper fit, color coordination, and seasonal appropriateness
+    - Aesthetic: Modern, polished, and fashion-forward appearance
+    - Background: Clean, minimalist backdrop in neutral tones (white, light gray, or soft beige)
+    - Lighting: Professional studio lighting with soft shadows to highlight outfit details
+    - Image quality: High-resolution, sharp focus on clothing details and overall composition
+
+    DESIGN PRINCIPLES:
+    - Maintain elegance and sophistication appropriate for the specified occasion
+    - Ensure color harmony and balanced proportions
+    - Consider current fashion trends while maintaining timeless appeal
+    - Focus on creating a cohesive, well-curated look from head to toe
+
+    Style the model to embody confidence and grace, showcasing how the outfit would look on someone attending ${occasion}.`;
 
     // Convert all images to inline base64 format (filter out undefined/null URLs)
     const imageParts = await Promise.all(
@@ -39,7 +52,7 @@ Make the mannequin look elegant, well-dressed, and appropriate for the occasion.
 
     // Create content parts - starting with text prompt
     const parts = [{ text: prompt }];
-    
+
     // Add image parts if they exist
     for (const image of imageParts) {
       parts.push({
@@ -57,7 +70,7 @@ Make the mannequin look elegant, well-dressed, and appropriate for the occasion.
       contents: [contents], // Needs to be an array of content items
       config: {
         responseModalities: [Modality.TEXT, Modality.IMAGE],
-    },
+      },
     });
 
     // Extract the response properly
@@ -75,9 +88,9 @@ Make the mannequin look elegant, well-dressed, and appropriate for the occasion.
     // Extract URL from text response (you might need to parse this differently)
     // const urlMatch = textResponse.match(/https?:\/\/[^\s]+/);
     // return urlMatch ? urlMatch[0] : null;
-return imagePart.inlineData.data
-  ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
-  : null;
+    return imagePart.inlineData.data
+      ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
+      : null;
   } catch (error) {
     console.error("Error generating mannequin image:", error);
     throw error;

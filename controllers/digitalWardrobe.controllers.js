@@ -475,8 +475,6 @@ export const deleteGarment = async (req, res) => {
   }
 };
 
-
-
 export const getGarmentsByCategory = async (req, res) => {
   try {
     const { category } = req.query;
