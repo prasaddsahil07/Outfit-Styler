@@ -65,6 +65,7 @@ export const getCategoryCounts = async (req, res) => {
   }
 };
 
+// for handling duplicates items in wardrobe
 function generateImageHash(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 };
@@ -439,26 +440,40 @@ export const deleteGarment = async (req, res) => {
     const wardrobe = await DigitalWardrobe.findOne({ userId });
     if (!wardrobe) return res.status(404).json({ message: 'Wardrobe not found' });
 
-    const imageToDelete = wardrobe.uploadedImages.find(img => img._id.equals(garmentId));
-    if (!imageToDelete) return res.status(404).json({ message: 'Garment image entry not found' });
+    let imageFound = null;
 
-    const deleted = await deleteFromCloudinary(imageToDelete.imageUrl);
-    if (!deleted) {
-      console.warn(`Cloudinary deletion failed for image: ${imageToDelete.imageUrl}`);
+    // Find the image that contains this garmentId
+    for (const image of wardrobe.uploadedImages) {
+      const garmentIndex = image.garments.findIndex(g => g._id.toString() === garmentId);
+      if (garmentIndex !== -1) {
+        // Remove that garment
+        image.garments.splice(garmentIndex, 1);
+
+        // If no garments left, remove image from cloudinary and wardrobe
+        if (image.garments.length === 0) {
+          await deleteFromCloudinary(image.imageUrl);
+          wardrobe.uploadedImages = wardrobe.uploadedImages.filter(img => img._id.toString() !== image._id.toString());
+        }
+
+        imageFound = true;
+        break;
+      }
     }
 
-    await DigitalWardrobe.updateOne(
-      { userId },
-      { $pull: { uploadedImages: { _id: garmentId } } }
-    );
+    if (!imageFound) {
+      return res.status(404).json({ message: 'Garment not found in any image' });
+    }
 
-    return res.status(200).json({ message: 'Garment image entry deleted successfully' });
+    await wardrobe.save();
+
+    return res.status(200).json({ message: 'Garment deleted successfully' });
 
   } catch (err) {
     console.error('Delete garment error:', err);
     return res.status(500).json({ message: 'Failed to delete garment', error: err.message });
   }
 };
+
 
 export const getGarmentsByCategory = async (req, res) => {
   try {

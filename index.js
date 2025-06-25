@@ -6,7 +6,7 @@ import job from "./cron.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
+
 import { connectDB } from "./db/connectDB.js";
 import OpenAI from "openai";
 import cors from "cors";
@@ -24,6 +24,7 @@ import savedImagesRoute from "./routes/savedImages.routes.js";
 import fashionNewsRoute from "./routes/homeScreen.routes.js";
 import dailyPostRoute from "./routes/dailyPost.routes.js";
 import instaPostRoute from "./routes/instaPosts.routes.js";
+import stylingRoute from "./routes/generateImages.routes.js";
 import styleRecommenderRoute from "./routes/styleRecommender.routes.js";
 // import newsRoute from "./routes/news.js";
 
@@ -76,6 +77,7 @@ app.use("/api/fashionNews", fashionNewsRoute);
 app.use("/api/dailyPost", dailyPostRoute);
 app.use("/api/instaPosts", instaPostRoute);
 app.use("/api/styleRecommender", styleRecommenderRoute);
+app.use("/api/styling", stylingRoute);
 // app.use("/api/fashion", newsRoute);
 
 
