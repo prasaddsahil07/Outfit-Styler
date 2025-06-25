@@ -6,10 +6,10 @@ import {
   updateGarment, 
   deleteGarment, 
   getGarmentsByCategory, 
-  getGarmentsByFabric, 
-  getGarmentsByOccasion, 
-  getGarmentsBySeason,
-  getGarmentsByColor,
+  // getGarmentsByFabric, 
+  // getGarmentsByOccasion, 
+  // getGarmentsBySeason,
+  // getGarmentsByColor,
   filterGarments,
   getCategoryCounts ,
   getGarmentDetails
@@ -44,6 +44,6 @@ router.get("/garments/category", verifyJWT, getGarmentsByCategory);
 // router.get("/garments/color", verifyJWT, getGarmentsByColor);
 
 // filter garments by any combination of attributes
-router.get("filterGarments", verifyJWT, filterGarments);
+router.get("/filterGarments", verifyJWT, filterGarments);
 
 export default router;

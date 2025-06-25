@@ -440,39 +440,42 @@ export const deleteGarment = async (req, res) => {
     const wardrobe = await DigitalWardrobe.findOne({ userId });
     if (!wardrobe) return res.status(404).json({ message: 'Wardrobe not found' });
 
-    let imageFound = null;
+    // Find the image containing this garment
+    const targetImage = wardrobe.uploadedImages.find(image =>
+      image.garments.some(g => g._id.toString() === garmentId)
+    );
 
-    // Find the image that contains this garmentId
-    for (const image of wardrobe.uploadedImages) {
-      const garmentIndex = image.garments.findIndex(g => g._id.toString() === garmentId);
-      if (garmentIndex !== -1) {
-        // Remove that garment
-        image.garments.splice(garmentIndex, 1);
-
-        // If no garments left, remove image from cloudinary and wardrobe
-        if (image.garments.length === 0) {
-          await deleteFromCloudinary(image.imageUrl);
-          wardrobe.uploadedImages = wardrobe.uploadedImages.filter(img => img._id.toString() !== image._id.toString());
-        }
-
-        imageFound = true;
-        break;
-      }
+    if (!targetImage) {
+      return res.status(404).json({ message: 'Garment not found in wardrobe' });
     }
 
-    if (!imageFound) {
-      return res.status(404).json({ message: 'Garment not found in any image' });
-    }
+    // Remove garment from image
+    const updatedGarments = targetImage.garments.filter(g => g._id.toString() !== garmentId);
 
-    await wardrobe.save();
+    // If no garments left, delete entire image
+    if (updatedGarments.length === 0) {
+      await deleteFromCloudinary(targetImage.imageUrl);
+
+      await DigitalWardrobe.findOneAndUpdate(
+        { userId },
+        { $pull: { uploadedImages: { _id: targetImage._id } } }
+      );
+    } else {
+      // Replace garments in the matched image with the updated array
+      await DigitalWardrobe.updateOne(
+        { userId, 'uploadedImages._id': targetImage._id },
+        { $set: { 'uploadedImages.$.garments': updatedGarments } }
+      );
+    }
 
     return res.status(200).json({ message: 'Garment deleted successfully' });
-
   } catch (err) {
-    console.error('Delete garment error:', err);
-    return res.status(500).json({ message: 'Failed to delete garment', error: err.message });
+    console.error('Error deleting garment:', err);
+    return res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 };
+
+
 
 export const getGarmentsByCategory = async (req, res) => {
   try {
@@ -581,7 +584,8 @@ export const filterGarments = async (req, res) => {
 
         if (isMatch) {
           filtered.push({
-            _id: garment._id,
+            garmentId: garment._id,
+            imageId: image._id,
             itemName: garment.itemName,
             imageUrl: image.imageUrl,
             createdAt: image.createdAt,
@@ -608,7 +612,6 @@ export const filterGarments = async (req, res) => {
     });
   }
 };
-
 
 // export const getGarmentsByFabric = async (req, res) => {
 
@@ -757,6 +760,7 @@ export const getGarmentDetails = async (req, res) => {
       image.garments
         .filter(g => g._id.toString() === garmentId)
         .map(g => ({
+          garmentId: g._id,
           imageId: image._id,
           itemName: g.itemName,
           category: g.category,
