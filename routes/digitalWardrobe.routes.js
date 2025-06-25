@@ -10,6 +10,7 @@ import {
   getGarmentsByOccasion, 
   getGarmentsBySeason,
   getGarmentsByColor,
+  filterGarments,
   getCategoryCounts ,
   getGarmentDetails
 } from "../controllers/digitalWardrobe.controllers.js";
@@ -37,9 +38,12 @@ router.delete("/deleteGarment/:garmentId", verifyJWT, deleteGarment);
 
 // Get garments by various filters (using query params instead of path params)
 router.get("/garments/category", verifyJWT, getGarmentsByCategory);
-router.get("/garments/fabric", verifyJWT, getGarmentsByFabric);
-router.get("/garments/occasion", verifyJWT, getGarmentsByOccasion);
-router.get("/garments/season", verifyJWT, getGarmentsBySeason);
-router.get("/garments/color", verifyJWT, getGarmentsByColor);
+// router.get("/garments/fabric", verifyJWT, getGarmentsByFabric);
+// router.get("/garments/occasion", verifyJWT, getGarmentsByOccasion);
+// router.get("/garments/season", verifyJWT, getGarmentsBySeason);
+// router.get("/garments/color", verifyJWT, getGarmentsByColor);
+
+// filter garments by any combination of attributes
+router.get("filterGarments", verifyJWT, filterGarments);
 
 export default router;

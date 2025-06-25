@@ -474,7 +474,6 @@ export const deleteGarment = async (req, res) => {
   }
 };
 
-
 export const getGarmentsByCategory = async (req, res) => {
   try {
     const { category } = req.query;
@@ -498,7 +497,7 @@ export const getGarmentsByCategory = async (req, res) => {
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     );
 
-    if (category === "All") {
+    if (category === "Recent") {
       const allGarments = sortedImages.flatMap(image =>
         image.garments.map(garment => ({
           imageId: image._id,
@@ -543,133 +542,203 @@ export const getGarmentsByCategory = async (req, res) => {
   }
 };
 
-export const getGarmentsByFabric = async (req, res) => {
+export const filterGarments = async (req, res) => {
   try {
-    const { fabric } = req.query;
     const userId = req.user._id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized access' });
+    }
 
-    if (!fabric) return res.status(400).json({ message: 'Fabric is required as query param' });
+    const {
+      category,
+      color,
+      fabric,
+      occasion,
+      season
+    } = req.query;
+
+    const categoryFilter = category ? category.split(',') : null;
+    const colorFilter = color ? color.split(',') : null;
+    const fabricFilter = fabric ? fabric.split(',') : null;
+    const occasionFilter = occasion ? occasion.split(',') : null;
+    const seasonFilter = season ? season.split(',') : null;
 
     const wardrobe = await DigitalWardrobe.findOne({ userId });
-
-    if (!wardrobe || wardrobe.uploadedImages.length === 0)
+    if (!wardrobe || wardrobe.uploadedImages.length === 0) {
       return res.status(404).json({ message: 'No garments found in wardrobe' });
+    }
 
-    const result = wardrobe.uploadedImages
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .flatMap(image =>
-        image.garments
-          .filter(g => g.fabric === fabric)
-          .map(g => ({
-            imageId: image._id,
-            itemName: g.itemName,
+    const filtered = [];
+
+    for (const image of wardrobe.uploadedImages) {
+      for (const garment of image.garments) {
+        const isMatch =
+          (!categoryFilter || categoryFilter.includes(garment.category)) &&
+          (!fabricFilter || fabricFilter.includes(garment.fabric)) &&
+          (!colorFilter || colorFilter.includes(garment.color?.name)) &&
+          (!occasionFilter || garment.occasion?.some(o => occasionFilter.includes(o))) &&
+          (!seasonFilter || garment.season?.some(s => seasonFilter.includes(s)));
+
+        if (isMatch) {
+          filtered.push({
+            _id: garment._id,
+            itemName: garment.itemName,
             imageUrl: image.imageUrl,
             createdAt: image.createdAt,
-          }))
-      );
+            category: garment.category,
+            color: garment.color,
+            fabric: garment.fabric,
+            occasion: garment.occasion,
+            season: garment.season
+          });
+        }
+      }
+    }
 
-    res.status(200).json({ message: `Garments with fabric: ${fabric}`, results: result });
+    return res.status(200).json({
+      message: 'Filtered garments retrieved successfully',
+      results: filtered
+    });
+
   } catch (err) {
-    console.error('Error fetching by fabric:', err);
-    res.status(500).json({ message: 'Failed to fetch garments by fabric' });
+    console.error('Error in filterGarments:', err);
+    return res.status(500).json({
+      message: 'Failed to filter garments',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
-export const getGarmentsByOccasion = async (req, res) => {
-  try {
-    const { occasion } = req.query;
-    const userId = req.user._id;
 
-    if (!occasion) return res.status(400).json({ message: 'Occasion is required as query param' });
+// export const getGarmentsByFabric = async (req, res) => {
 
-    const wardrobe = await DigitalWardrobe.findOne({ userId });
 
-    if (!wardrobe || wardrobe.uploadedImages.length === 0)
-      return res.status(404).json({ message: 'No garments found in wardrobe' });
+//   try {
+//     const { fabric } = req.query;
+//     const userId = req.user._id;
 
-    const result = wardrobe.uploadedImages
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .flatMap(image =>
-        image.garments
-          .filter(g => g.occasion.includes(occasion))
-          .map(g => ({
-            imageId: image._id,
-            itemName: g.itemName,
-            imageUrl: image.imageUrl,
-            createdAt: image.createdAt,
-          }))
-      );
+//     if (!fabric) return res.status(400).json({ message: 'Fabric is required as query param' });
 
-    res.status(200).json({ message: `Garments with occasion: ${occasion}`, results: result });
-  } catch (err) {
-    console.error('Error fetching by occasion:', err);
-    res.status(500).json({ message: 'Failed to fetch garments by occasion' });
-  }
-};
+//     const wardrobe = await DigitalWardrobe.findOne({ userId });
 
-export const getGarmentsBySeason = async (req, res) => {
-  try {
-    const { season } = req.query;
-    const userId = req.user._id;
+//     if (!wardrobe || wardrobe.uploadedImages.length === 0)
+//       return res.status(404).json({ message: 'No garments found in wardrobe' });
 
-    if (!season) return res.status(400).json({ message: 'Season is required as query param' });
+//     const result = wardrobe.uploadedImages
+//       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+//       .flatMap(image =>
+//         image.garments
+//           .filter(g => g.fabric === fabric)
+//           .map(g => ({
+//             imageId: image._id,
+//             itemName: g.itemName,
+//             imageUrl: image.imageUrl,
+//             createdAt: image.createdAt,
+//           }))
+//       );
 
-    const wardrobe = await DigitalWardrobe.findOne({ userId });
+//     res.status(200).json({ message: `Garments with fabric: ${fabric}`, results: result });
+//   } catch (err) {
+//     console.error('Error fetching by fabric:', err);
+//     res.status(500).json({ message: 'Failed to fetch garments by fabric' });
+//   }
+// };
 
-    if (!wardrobe || wardrobe.uploadedImages.length === 0)
-      return res.status(404).json({ message: 'No garments found in wardrobe' });
+// export const getGarmentsByOccasion = async (req, res) => {
+//   try {
+//     const { occasion } = req.query;
+//     const userId = req.user._id;
 
-    const result = wardrobe.uploadedImages
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .flatMap(image =>
-        image.garments
-          .filter(g => g.season.includes(season))
-          .map(g => ({
-            imageId: image._id,
-            itemName: g.itemName,
-            imageUrl: image.imageUrl,
-            createdAt: image.createdAt,
-          }))
-      );
+//     if (!occasion) return res.status(400).json({ message: 'Occasion is required as query param' });
 
-    res.status(200).json({ message: `Garments with season: ${season}`, results: result });
-  } catch (err) {
-    console.error('Error fetching by season:', err);
-    res.status(500).json({ message: 'Failed to fetch garments by season' });
-  }
-};
+//     const wardrobe = await DigitalWardrobe.findOne({ userId });
 
-export const getGarmentsByColor = async (req, res) => {
-  try {
-    const { color } = req.query;
-    const userId = req.user._id;
+//     if (!wardrobe || wardrobe.uploadedImages.length === 0)
+//       return res.status(404).json({ message: 'No garments found in wardrobe' });
 
-    if (!color) return res.status(400).json({ message: 'Color is required as query param' });
+//     const result = wardrobe.uploadedImages
+//       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+//       .flatMap(image =>
+//         image.garments
+//           .filter(g => g.occasion.includes(occasion))
+//           .map(g => ({
+//             imageId: image._id,
+//             itemName: g.itemName,
+//             imageUrl: image.imageUrl,
+//             createdAt: image.createdAt,
+//           }))
+//       );
 
-    const wardrobe = await DigitalWardrobe.findOne({ userId });
+//     res.status(200).json({ message: `Garments with occasion: ${occasion}`, results: result });
+//   } catch (err) {
+//     console.error('Error fetching by occasion:', err);
+//     res.status(500).json({ message: 'Failed to fetch garments by occasion' });
+//   }
+// };
 
-    if (!wardrobe || wardrobe.uploadedImages.length === 0)
-      return res.status(404).json({ message: 'No garments found in wardrobe' });
+// export const getGarmentsBySeason = async (req, res) => {
+//   try {
+//     const { season } = req.query;
+//     const userId = req.user._id;
 
-    const result = wardrobe.uploadedImages
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .flatMap(image =>
-        image.garments
-          .filter(g => g.color.name === color)
-          .map(g => ({
-            imageId: image._id,
-            itemName: g.itemName,
-            imageUrl: image.imageUrl,
-            createdAt: image.createdAt,
-          }))
-      );
+//     if (!season) return res.status(400).json({ message: 'Season is required as query param' });
 
-    res.status(200).json({ message: `Garments with color: ${color}`, results: result });
-  } catch (err) {
-    console.error('Error fetching by color:', err);
-    res.status(500).json({ message: 'Failed to fetch garments by color' });
-  }
-};
+//     const wardrobe = await DigitalWardrobe.findOne({ userId });
+
+//     if (!wardrobe || wardrobe.uploadedImages.length === 0)
+//       return res.status(404).json({ message: 'No garments found in wardrobe' });
+
+//     const result = wardrobe.uploadedImages
+//       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+//       .flatMap(image =>
+//         image.garments
+//           .filter(g => g.season.includes(season))
+//           .map(g => ({
+//             imageId: image._id,
+//             itemName: g.itemName,
+//             imageUrl: image.imageUrl,
+//             createdAt: image.createdAt,
+//           }))
+//       );
+
+//     res.status(200).json({ message: `Garments with season: ${season}`, results: result });
+//   } catch (err) {
+//     console.error('Error fetching by season:', err);
+//     res.status(500).json({ message: 'Failed to fetch garments by season' });
+//   }
+// };
+
+// export const getGarmentsByColor = async (req, res) => {
+//   try {
+//     const { color } = req.query;
+//     const userId = req.user._id;
+
+//     if (!color) return res.status(400).json({ message: 'Color is required as query param' });
+
+//     const wardrobe = await DigitalWardrobe.findOne({ userId });
+
+//     if (!wardrobe || wardrobe.uploadedImages.length === 0)
+//       return res.status(404).json({ message: 'No garments found in wardrobe' });
+
+//     const result = wardrobe.uploadedImages
+//       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+//       .flatMap(image =>
+//         image.garments
+//           .filter(g => g.color.name === color)
+//           .map(g => ({
+//             imageId: image._id,
+//             itemName: g.itemName,
+//             imageUrl: image.imageUrl,
+//             createdAt: image.createdAt,
+//           }))
+//       );
+
+//     res.status(200).json({ message: `Garments with color: ${color}`, results: result });
+//   } catch (err) {
+//     console.error('Error fetching by color:', err);
+//     res.status(500).json({ message: 'Failed to fetch garments by color' });
+//   }
+// };
 
 export const getGarmentDetails = async (req, res) => {
   const { garmentId } = req.params;
