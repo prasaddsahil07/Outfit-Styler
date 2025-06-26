@@ -77,17 +77,22 @@ export const selectWardrobeItem = (wardrobeItems, userId, occasion) => {
     return wardrobeItems[index];
 };
 
-export const generateWardrobeStyledImage = async (selectedGarment, occasion) => {
+export const generateWardrobeStyledImage = async (selectedGarment, occasion, description = '') => {
     try {
         // Convert image to base64
         const base64Image = await convertImageToBase64(selectedGarment.imageUrl);
+
+        // Build description section for the prompt
+        const descriptionSection = description && description.trim() 
+            ? `\n📝 ADDITIONAL STYLING REQUIREMENTS:\n- ${description.trim()}\n- Incorporate these specific preferences while maintaining the overall styling guidelines\n`
+            : '';
 
         const wardrobePrompt = `
 ROLE: You are a professional fashion stylist creating a complete styled outfit using a specific wardrobe item.
 
 OBJECTIVE: 
 Create a complete, professionally styled outfit for a **${occasion}** occasion, featuring the clothing item shown in the provided image as the main piece.
-
+${descriptionSection}
 ✅ STYLING REQUIREMENTS:
 - Use the provided clothing item as the CENTRAL piece of the outfit
 - Complete the look with complementary pieces:
@@ -141,7 +146,8 @@ Transform the user's wardrobe item into a stunning, occasion-appropriate complet
                         type: 'wardrobe',
                         imageB64: part.inlineData.data,
                         itemName: selectedGarment.itemName,
-                        itemId: selectedGarment.imageId
+                        itemId: selectedGarment.imageId,
+                        description: description || null
                     }
                 };
             }
@@ -158,7 +164,7 @@ Transform the user's wardrobe item into a stunning, occasion-appropriate complet
     }
 };
 
-export const processWardrobeItemForOccasion = async (req, occasion) => {
+export const processWardrobeItemForOccasion = async (req, occasion, description = '') => {
     try {
         // Get wardrobe items for the occasion
         const wardrobeItems = await getGarmentsFromWardrobe(req, occasion);
@@ -174,8 +180,8 @@ export const processWardrobeItemForOccasion = async (req, occasion) => {
         // Select a wardrobe item using rotation logic
         const selectedGarment = selectWardrobeItem(wardrobeItems, req.user._id, occasion);
         
-        // Generate styled image
-        const result = await generateWardrobeStyledImage(selectedGarment, occasion);
+        // Generate styled image with optional description
+        const result = await generateWardrobeStyledImage(selectedGarment, occasion, description);
         
         if (result.success) {
             return {

@@ -20,7 +20,7 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-export async function generateModelImage(imageUrls, occasion, badItemImages = []) {
+export async function generateModelImage(imageUrls, occasion, badItemImages = [], description = "") {
   try {
     const [top, bottom, accessory, footwear] = imageUrls;
     const labels = ['Topwear', 'Bottomwear', 'Accessory', 'Footwear'];
@@ -65,16 +65,22 @@ export async function generateModelImage(imageUrls, occasion, badItemImages = []
       itemInstructions += `• Accessories: GENERATE tasteful accessories for ${occasion} that enhance the overall look\n`;
     }
 
+    // Build description section for the prompt
+    const descriptionSection = description && description.trim() 
+      ? `\nADDITIONAL STYLING REQUIREMENTS:\n${description.trim()}\n- Incorporate these specific preferences while maintaining the overall styling guidelines and occasion appropriateness\n- Balance user preferences with the provided reference items and occasion requirements\n`
+      : '';
+
     const prompt = `You are an expert fashion stylist AI specializing in creating sophisticated, occasion-appropriate outfits. Generate a high-quality, full-body image of an elegant female model styled for: ${occasion}.
 
     ${itemInstructions}
-
+    ${descriptionSection}
     CRITICAL INSTRUCTIONS:
     - For items with reference images: REPLICATE them exactly as shown (colors, patterns, style, fit)
     - For missing items: CREATE complementary pieces that work harmoniously with the provided items
     - Ensure all generated items are appropriate for the specified occasion: ${occasion}
     - Maintain color coordination and style consistency across all items
     - If only some items are provided, make sure the AI-generated items complement and enhance the user's choices
+    ${description && description.trim() ? `- Incorporate the user's styling preferences: "${description.trim()}" while maintaining occasion appropriateness` : ''}
 
     VISUAL SPECIFICATIONS:
     - Model pose: Confident, natural stance with good posture
@@ -90,8 +96,9 @@ export async function generateModelImage(imageUrls, occasion, badItemImages = []
     - Consider current fashion trends while maintaining timeless appeal
     - Focus on creating a cohesive, well-curated look from head to toe
     - The final outfit should look intentionally styled, not like random pieces put together
+    ${description && description.trim() ? `- Reflect the user's personal style preferences: "${description.trim()}" in the overall aesthetic` : ''}
 
-    Style the model to embody confidence and grace, showcasing how this complete outfit would look for ${occasion}.`;
+    Style the model to embody confidence and grace, showcasing how this complete outfit would look for ${occasion}${description && description.trim() ? ` with the requested styling approach` : ''}.`;
 
     // Convert only the good items to base64 format
     const imageParts = await Promise.all(
@@ -129,7 +136,7 @@ export async function generateModelImage(imageUrls, occasion, badItemImages = []
       ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
       : null;
   } catch (error) {
-    console.error("Error generating mannequin image:", error);
-    throw error;
+      console.error("Error generating mannequin image:", error);
+      throw error;
   }
 }

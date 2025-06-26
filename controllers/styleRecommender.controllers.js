@@ -9,6 +9,7 @@ export const styleRecommenderController = async (req, res) => {
     try {
         const imageFiles = req.files;
         const occasion = req.body.occasion;
+        const description = req.body.description || ""; // Optional description for wardrobe item
 
         if (!imageFiles?.length) {
             return res.status(400).json({ error: "No images provided" });
@@ -38,15 +39,20 @@ export const styleRecommenderController = async (req, res) => {
         let wardrobeImageResponse = null;
         let aiGeneratedImageResponse = null;
 
+        const results = [];
+
         // Always try to get wardrobe image first
-        wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion);
+        wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion, description);
+        results.push(wardrobeImageResponse?.data || null);
 
         // Determine how many AI images to generate based on wardrobe availability
         const aiImageCount = wardrobeImageResponse?.data ? 1 : 2;
 
         // Generate content for all cases
-        modelImage = await generateModelImage(imageUrls, occasion, badItemImages);
-        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount);
+        modelImage = await generateModelImage(imageUrls, occasion, badItemImages, description);
+        results.push(modelImage);
+        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount, description);
+        results.push(aiGeneratedImageResponse?.data || null);
         
         // Set message based on match status
         if (isPerfectMatch) {
@@ -57,10 +63,11 @@ export const styleRecommenderController = async (req, res) => {
 
         res.status(200).json({
             recommendations: critique,
-            modelImage,
-            wardrobeImage: wardrobeImageResponse?.data || null,
-            aiGeneratedImages: aiGeneratedImageResponse?.data || null,
-            hasWardrobeImage: !!wardrobeImageResponse?.data,
+            results,
+            occasion,
+            // modelImage,
+            // wardrobeImage: wardrobeImageResponse?.data || null,
+            // aiGeneratedImages: aiGeneratedImageResponse?.data || null,
             aiImageCount, // Let frontend know how many AI images to expect
             message: niceMessage,
             badItemImages, // This will be populated for mismatches
