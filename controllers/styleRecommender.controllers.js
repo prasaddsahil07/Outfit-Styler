@@ -3,7 +3,7 @@ import { generateModelImage } from "../services/mannequinGenerator.js";
 import { processWardrobeItemForOccasion } from "../services/aiImageFromWardrobeItem.js";
 import { generateAIFashionSuggestions } from "../services/aiImageGeneration.js";
 
-import { deleteFromCloudinary } from "../utils/cloudinary.js";
+// import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 export const styleRecommenderController = async (req, res) => {
     try {
@@ -38,32 +38,37 @@ export const styleRecommenderController = async (req, res) => {
         let wardrobeImageResponse = null;
         let aiGeneratedImageResponse = null;
 
+        // Always try to get wardrobe image first
+        wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion);
+
+        // Determine how many AI images to generate based on wardrobe availability
+        const aiImageCount = wardrobeImageResponse?.data ? 1 : 2;
+
+        // Generate content for all cases
+        modelImage = await generateModelImage(imageUrls, occasion, badItemImages);
+        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount);
+        
+        // Set message based on match status
         if (isPerfectMatch) {
-            // Generate additional content for perfect matches
-            modelImage = await generateModelImage(imageUrls, occasion, badItemImages);
-            wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion);
-            aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, 1);
             niceMessage = "Here's your perfectly styled outfit visualized! 💃✨";
         } else {
-            // Generate model image even for mismatches, but exclude bad items
-            modelImage = await generateModelImage(imageUrls, occasion, badItemImages);
-            wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion);
-            aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, 1);
             niceMessage = "Here's your outfit visualized with AI suggestions! 🛍️✨";
         }
 
         res.status(200).json({
             recommendations: critique,
             modelImage,
-            wardrobeImage: wardrobeImageResponse?.data?.imageB64 || null,
-            aiGeneratedImage: aiGeneratedImageResponse?.data?.imageB64 || null,
+            wardrobeImage: wardrobeImageResponse?.data || null,
+            aiGeneratedImages: aiGeneratedImageResponse?.data || null,
+            hasWardrobeImage: !!wardrobeImageResponse?.data,
+            aiImageCount, // Let frontend know how many AI images to expect
             message: niceMessage,
             badItemImages, // This will be populated for mismatches
             isPerfectMatch, // Added this for frontend logic
             suitabilityDetails, // Added this for detailed feedback
         });
 
-        await Promise.all(imageUrls.map(deleteFromCloudinary(url => url)));
+        // await Promise.all(imageUrls.map(deleteFromCloudinary(url => url)));
     } catch (error) {
         console.error("Error in styleRecommenderController:", error);
         res.status(500).json({ error: "Internal Server Error" });
