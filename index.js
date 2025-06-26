@@ -20,7 +20,7 @@ import userRoute from "./routes/users.routes.js";
 import userBodyInfoRoute from "./routes/userBodyInfo.routes.js";
 import wardrobeRoute from "./routes/digitalWardrobe.routes.js";
 import imageRoute from "./routes/image.js";
-import savedImagesRoute from "./routes/savedImages.routes.js";
+import savedFavouritesRoute from "./routes/savedFavourites.routes.js";
 import fashionNewsRoute from "./routes/homeScreen.routes.js";
 import dailyPostRoute from "./routes/dailyPost.routes.js";
 import instaPostRoute from "./routes/instaPosts.routes.js";
@@ -57,7 +57,6 @@ if (!fs.existsSync(tmpPath)) {
 
 app.use("/upload", imageRoute);
 
-
 app.use(express.static("public"));
 
 app.use(cors({
@@ -72,7 +71,7 @@ app.use("/api/users", userRoute);
 app.use("/api/events", eventRoute);
 app.use("/api/userBodyInfo", userBodyInfoRoute);
 app.use("/api/wardrobe", wardrobeRoute);
-app.use("/api/savedImages", savedImagesRoute);
+app.use("/api/savedFavourites", savedFavouritesRoute);
 app.use("/api/fashionNews", fashionNewsRoute);
 app.use("/api/dailyPost", dailyPostRoute);
 app.use("/api/instaPosts", instaPostRoute);
