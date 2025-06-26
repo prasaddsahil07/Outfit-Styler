@@ -20,14 +20,61 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-export async function generateModelImage(imageUrls, occasion) {
+export async function generateModelImage(imageUrls, occasion, badItemImages = []) {
   try {
     const [top, bottom, accessory, footwear] = imageUrls;
+    const labels = ['Topwear', 'Bottomwear', 'Accessory', 'Footwear'];
+    
+    // Filter out bad items - only use good items for AI generation
+    const goodItems = imageUrls.map((url, index) => ({
+      url,
+      label: labels[index],
+      isGood: url && !badItemImages.includes(url)
+    })).filter(item => item.url && item.isGood);
+
+    // Identify what items we have vs what we need AI to generate
+    const hasTop = goodItems.some(item => item.label === 'Topwear');
+    const hasBottom = goodItems.some(item => item.label === 'Bottomwear');
+    const hasAccessory = goodItems.some(item => item.label === 'Accessory');
+    const hasFootwear = goodItems.some(item => item.label === 'Footwear');
+
+    // Build dynamic prompt based on what user provided vs what AI needs to generate
+    let itemInstructions = "OUTFIT COMPOSITION:\n";
+    
+    if (hasTop) {
+      itemInstructions += "• Topwear: USE the exact topwear shown in the reference image - match its style, color, and design precisely\n";
+    } else {
+      itemInstructions += `• Topwear: GENERATE appropriate topwear for ${occasion} that complements the provided items\n`;
+    }
+    
+    if (hasBottom) {
+      itemInstructions += "• Bottomwear: USE the exact bottomwear shown in the reference image - match its style, color, and design precisely\n";
+    } else {
+      itemInstructions += `• Bottomwear: GENERATE appropriate bottomwear for ${occasion} that complements the provided items\n`;
+    }
+    
+    if (hasFootwear) {
+      itemInstructions += "• Footwear: USE the exact footwear shown in the reference image - match its style, color, and design precisely\n";
+    } else {
+      itemInstructions += `• Footwear: GENERATE appropriate footwear for ${occasion} that complements the provided items\n`;
+    }
+    
+    if (hasAccessory) {
+      itemInstructions += "• Accessories: USE the exact accessories shown in the reference image - match their style, color, and design precisely\n";
+    } else {
+      itemInstructions += `• Accessories: GENERATE tasteful accessories for ${occasion} that enhance the overall look\n`;
+    }
 
     const prompt = `You are an expert fashion stylist AI specializing in creating sophisticated, occasion-appropriate outfits. Generate a high-quality, full-body image of an elegant female model styled for: ${occasion}.
 
-    STYLING REQUIREMENTS:
-    ${top ? "• Top: Select sophisticated topwear that complements the occasion and body silhouette\n" : ""}${bottom ? "• Bottom: Choose well-fitted bottomwear that balances the overall look\n" : ""}${accessory ? "• Accessories: Include tasteful accessories that enhance without overwhelming the outfit\n" : ""}${footwear ? "• Footwear: Select appropriate shoes that complete the ensemble\n" : ""}
+    ${itemInstructions}
+
+    CRITICAL INSTRUCTIONS:
+    - For items with reference images: REPLICATE them exactly as shown (colors, patterns, style, fit)
+    - For missing items: CREATE complementary pieces that work harmoniously with the provided items
+    - Ensure all generated items are appropriate for the specified occasion: ${occasion}
+    - Maintain color coordination and style consistency across all items
+    - If only some items are provided, make sure the AI-generated items complement and enhance the user's choices
 
     VISUAL SPECIFICATIONS:
     - Model pose: Confident, natural stance with good posture
@@ -38,22 +85,23 @@ export async function generateModelImage(imageUrls, occasion) {
     - Image quality: High-resolution, sharp focus on clothing details and overall composition
 
     DESIGN PRINCIPLES:
-    - Maintain elegance and sophistication appropriate for the specified occasion
-    - Ensure color harmony and balanced proportions
+    - Maintain elegance and sophistication appropriate for ${occasion}
+    - Ensure color harmony and balanced proportions between provided and generated items
     - Consider current fashion trends while maintaining timeless appeal
     - Focus on creating a cohesive, well-curated look from head to toe
+    - The final outfit should look intentionally styled, not like random pieces put together
 
-    Style the model to embody confidence and grace, showcasing how the outfit would look on someone attending ${occasion}.`;
+    Style the model to embody confidence and grace, showcasing how this complete outfit would look for ${occasion}.`;
 
-    // Convert all images to inline base64 format (filter out undefined/null URLs)
+    // Convert only the good items to base64 format
     const imageParts = await Promise.all(
-      imageUrls.filter(url => url).map(fetchImageAsBase64)
+      goodItems.map(item => fetchImageAsBase64(item.url))
     );
 
     // Create content parts - starting with text prompt
     const parts = [{ text: prompt }];
 
-    // Add image parts if they exist
+    // Add image parts for the good items only
     for (const image of imageParts) {
       parts.push({
         inlineData: {
@@ -66,28 +114,17 @@ export async function generateModelImage(imageUrls, occasion) {
     const contents = createUserContent(parts);
 
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp", // Updated to latest flash model
-      contents: [contents], // Needs to be an array of content items
+      model: "gemini-2.0-flash-exp",
+      contents: [contents],
       config: {
         responseModalities: [Modality.TEXT, Modality.IMAGE],
       },
     });
 
-    // Extract the response properly
-    // const response = await result.response;
-    // if (!response.candidates || response.candidates.length === 0) {
-    //   throw new Error("No candidates in the response");
-    // }
-
-    // Assuming the response contains text with an image URL
+    // Extract the generated image
     const resultPart = result.candidates[0].content.parts;
     const imagePart = resultPart.find(p => p.inlineData);
 
-    // console.log("AI Response:", imagePart);
-
-    // Extract URL from text response (you might need to parse this differently)
-    // const urlMatch = textResponse.match(/https?:\/\/[^\s]+/);
-    // return urlMatch ? urlMatch[0] : null;
     return imagePart.inlineData.data
       ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
       : null;
