@@ -39,7 +39,7 @@ export const convertImageToBase64 = async (imageUrl) => {
         if (typeof imageUrl === 'string' && imageUrl.startsWith('data:image')) {
             return imageUrl.split(',')[1]; // Remove data:image/jpeg;base64, prefix
         }
-        
+
         // If it's a buffer
         if (Buffer.isBuffer(imageUrl)) {
             return imageUrl.toString('base64');
@@ -73,26 +73,68 @@ export const selectWardrobeItem = (wardrobeItems, userId, occasion) => {
     const sessionKey = `${userId}_${occasion}`;
     const currentTime = Date.now();
     const index = Math.floor((currentTime / 1000) % wardrobeItems.length);
-    
+
     return wardrobeItems[index];
 };
 
-export const generateWardrobeStyledImage = async (selectedGarment, occasion, description = '') => {
+export const generateWardrobeStyledImage = async (selectedGarment, occasion, description = '', req) => {
     try {
         // Convert image to base64
         const base64Image = await convertImageToBase64(selectedGarment.imageUrl);
 
+        const userBodyShape = req.user.userBodyInfo.bodyShape || "";
+        const userUnderTone = req.user.userBodyInfo.undertone || "";
+
+        // Set default height for women if not provided (average women's height: 5'4")
+        const userHeight = req.user.userBodyInfo.height &&
+            (req.user.userBodyInfo.height.feet > 0 || req.user.userBodyInfo.height.inches > 0)
+            ? req.user.userBodyInfo.height
+            : { feet: 5, inches: 4 };
+
+        // Format height for better readability
+        const heightString = `${userHeight.feet}'${userHeight.inches}"`;
+
+        // Build user profile section for the prompt
+        const userProfile = `
+👤 USER PROFILE FOR MODEL REPRESENTATION:
+- Body Shape: ${userBodyShape || 'Balanced proportions'}
+- Height: ${heightString}
+- Skin Undertone: ${userUnderTone || 'Neutral'}
+
+🎯 MODEL REQUIREMENTS:
+- Generate a female model that represents the user's body type and proportions
+- Show how the outfit would look on someone with the user's specific body shape
+- Use the undertone information for better color coordination in styling
+- Ensure the model's height and body proportions match the user's profile`;
+
         // Build description section for the prompt
-        const descriptionSection = description && description.trim() 
+        const descriptionSection = description && description.trim()
             ? `\n📝 ADDITIONAL STYLING REQUIREMENTS:\n- ${description.trim()}\n- Incorporate these specific preferences while maintaining the overall styling guidelines\n`
             : '';
 
+        // Enhanced occasion-specific styling guidelines
+        const getOccasionGuidelines = (occasion) => {
+            const guidelines = {
+                'casual': 'Relaxed, comfortable styling with trendy accessories',
+                'business': 'Professional, polished look with sophisticated accessories',
+                'formal': 'Elegant, refined styling with luxury accessories',
+                'party': 'Glamorous, eye-catching styling with statement accessories',
+                'date': 'Chic, attractive styling with romantic touches',
+                'wedding': 'Elegant, appropriate styling respecting wedding dress codes',
+                'vacation': 'Comfortable, stylish travel-appropriate styling',
+                'workout': 'Athletic, functional styling with sporty accessories'
+            };
+            return guidelines[occasion?.toLowerCase()] || 'Versatile, well-coordinated styling';
+        };
+
         const wardrobePrompt = `
-ROLE: You are a professional fashion stylist creating a complete styled outfit using a specific wardrobe item.
+ROLE: You are a professional fashion stylist and AI image generator creating a personalized styled outfit visualization.
 
 OBJECTIVE: 
 Create a complete, professionally styled outfit for a **${occasion}** occasion, featuring the clothing item shown in the provided image as the main piece.
+${userProfile}
 ${descriptionSection}
+
 ✅ STYLING REQUIREMENTS:
 - Use the provided clothing item as the CENTRAL piece of the outfit
 - Complete the look with complementary pieces:
@@ -100,23 +142,34 @@ ${descriptionSection}
   - Include suitable footwear for ${occasion}
   - Add 2-3 accessories that enhance the overall look (bag, jewelry, belt, scarf, etc.)
 - Ensure the entire outfit is perfect and appropriate for **${occasion}**
+- ${getOccasionGuidelines(occasion)}
 
 🎨 STYLING FOCUS:
-- Make the provided garment look its absolute best
-- Create a cohesive, well-coordinated look
-- Use colors and styles that complement the existing item
-- Consider the formality level required for ${occasion}
-- Show how this personal wardrobe item can be styled beautifully
+- Make the provided garment look its absolute best on the user's body type
+- Create a cohesive, well-coordinated look that flatters the user's body shape
+- Use colors that complement both the garment and work well with the user's undertone
+- Consider proportions that work well for the user's height (${heightString})
+- Show how this personal wardrobe item can be styled beautifully for the user's specific body type
 
-🖼️ VISUAL OUTPUT:
-- Show a professional female model wearing the complete styled outfit
-- Full-body shot with clean, neutral background
-- High-quality fashion photography style
-- Professional editorial look
-- Showcase the provided wardrobe item prominently and attractively
+🖼️ VISUAL OUTPUT REQUIREMENTS:
+- Generate a realistic female model with ${userBodyShape || 'balanced'} body shape and ${heightString} height proportions
+- The model should represent how the outfit would realistically look on someone with the user's body type
+- Full-body shot with clean, neutral background (white or soft gray)
+- High-quality fashion photography style with professional lighting
+- Confident, natural pose that showcases the complete outfit clearly
+- Focus on demonstrating how the outfit flatters the specific body shape
+- Ensure the model's proportions and body type match the user's profile for realistic visualization
 
-✨ GOAL:
-Transform the user's wardrobe item into a stunning, occasion-appropriate complete outfit styled on a professional model.
+✨ PERSONALIZATION GOAL:
+Create a realistic visualization showing how the user's wardrobe item would look when styled into a complete outfit on someone with their exact body specifications, providing an accurate preview of the styled look.
+
+🔧 TECHNICAL SPECIFICATIONS:
+- Photorealistic, high-resolution image generation
+- Professional fashion photography lighting and composition
+- Model body type and proportions that accurately represent the user's specifications
+- Clear focus on the provided garment while showing the complete styled outfit
+- Background that enhances but doesn't distract from the styling
+- Generate consistent, realistic human model based on the provided body specifications
 `;
 
         const wardrobeContents = [
@@ -134,6 +187,8 @@ Transform the user's wardrobe item into a stunning, occasion-appropriate complet
             contents: wardrobeContents,
             config: {
                 responseModalities: ["TEXT", "IMAGE"],
+                temperature: 0.7, // Slightly higher for more creative styling
+                topP: 0.9,
             },
         });
 
@@ -147,7 +202,13 @@ Transform the user's wardrobe item into a stunning, occasion-appropriate complet
                         imageB64: part.inlineData.data,
                         itemName: selectedGarment.itemName,
                         itemId: selectedGarment.imageId,
-                        description: description || null
+                        description: description || null,
+                        userProfile: {
+                            bodyShape: userBodyShape,
+                            height: heightString,
+                            undertone: userUnderTone
+                        },
+                        occasion: occasion
                     }
                 };
             }
@@ -159,7 +220,8 @@ Transform the user's wardrobe item into a stunning, occasion-appropriate complet
         console.error('Error generating wardrobe styled image:', error);
         return {
             success: false,
-            error: error.message
+            error: error.message,
+            userMessage: 'Unable to generate styled image. Please try again or contact support if the issue persists.'
         };
     }
 };
@@ -168,34 +230,32 @@ export const processWardrobeItemForOccasion = async (req, occasion, description 
     try {
         // Get wardrobe items for the occasion
         const wardrobeItems = await getGarmentsFromWardrobe(req, occasion);
-        
+
         if (wardrobeItems.length === 0) {
             return {
-                success: false,
-                message: 'No wardrobe items found for this occasion',
-                wardrobeItemsAvailable: 0
+                // success: false,
+                type: 'wardrobe',
+                imageB64: null,
             };
         }
 
         // Select a wardrobe item using rotation logic
         const selectedGarment = selectWardrobeItem(wardrobeItems, req.user._id, occasion);
-        
+
         // Generate styled image with optional description
-        const result = await generateWardrobeStyledImage(selectedGarment, occasion, description);
-        
+        const result = await generateWardrobeStyledImage(selectedGarment, occasion, description, req);
+
         if (result.success) {
             return {
-                success: true,
-                data: result.data,
-                wardrobeItemsAvailable: wardrobeItems.length,
-                message: 'Wardrobe styled image generated successfully'
+                // success: true,
+                type: 'wardrobe',
+                imageB64: 'result.data',
             };
         } else {
             return {
-                success: false,
-                error: result.error,
-                wardrobeItemsAvailable: wardrobeItems.length,
-                message: 'Failed to generate wardrobe styled image'
+                // success: false,
+                type: 'wardrobe',
+                imageB64: result.error,
             };
         }
 

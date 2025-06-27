@@ -1,18 +1,76 @@
 import { ai } from "../index.js";
 
-export const generateAIFashionSuggestions = async (occasion, numberOfImages = 3, description = "") => {
+export const generateAIFashionSuggestions = async (occasion, numberOfImages = 3, description = "", req) => {
     try {
+        const userBodyShape = req.user?.userBodyInfo?.bodyShape || "";
+        const userUnderTone = req.user?.userBodyInfo?.undertone || "";
+
+        // Set default height for women if not provided (average women's height: 5'4")
+        const userHeight = req.user?.userBodyInfo?.height &&
+            (req.user.userBodyInfo.height.feet > 0 || req.user.userBodyInfo.height.inches > 0)
+            ? req.user.userBodyInfo.height
+            : { feet: 5, inches: 4 };
+
+        // Build height description for the prompt
+        const heightDescription = `${userHeight.feet}'${userHeight.inches}"`;
+        
+        // Build body shape styling guidelines
+        const getBodyShapeGuidelines = (bodyShape) => {
+            const guidelines = {
+                'pear': 'Focus on balancing proportions by highlighting the upper body, using A-line silhouettes, and choosing tops that draw attention upward',
+                'apple': 'Emphasize the legs and neckline, use empire waists, flowing fabrics, and avoid tight-fitting tops around the midsection',
+                'hourglass': 'Highlight the natural waistline with fitted silhouettes, wrap styles, and tailored pieces that showcase the balanced proportions',
+                'rectangle': 'Create curves and definition with layering, belted waists, peplum styles, and pieces that add volume to hips and bust',
+                'inverted triangle': 'Balance broad shoulders with wider bottom silhouettes, bootcut pants, A-line skirts, and softer shoulder lines'
+            };
+            return guidelines[bodyShape.toLowerCase()] || 'Focus on creating flattering, well-fitted silhouettes that enhance natural proportions';
+        };
+
+        // Build undertone color guidelines
+        const getUndertoneColorGuidelines = (undertone) => {
+            const colorGuidelines = {
+                'warm': 'Use warm colors like coral, peach, golden yellow, warm reds, olive green, and cream. Avoid cool-toned colors like icy blues or stark whites',
+                'cool': 'Use cool colors like navy blue, emerald green, royal purple, true red, and crisp whites. Avoid warm yellows, oranges, or golden tones',
+                'neutral': 'Can wear both warm and cool colors effectively. Focus on colors that complement the occasion and outfit aesthetic'
+            };
+            return colorGuidelines[undertone.toLowerCase()] || 'Choose colors that complement the skin tone and enhance the overall look';
+        };
+
         // Build description section for the prompt
-        const descriptionSection = description && description.trim() 
+        const descriptionSection = description && description.trim()
             ? `\n📝 ADDITIONAL STYLING REQUIREMENTS:\n- ${description.trim()}\n- Incorporate these specific preferences across all ${numberOfImages} outfits while maintaining variety\n- Balance user preferences with occasion appropriateness and outfit diversity\n- Let the description influence the overall aesthetic direction of all looks\n`
             : '';
 
+        // Build personalization section
+        const personalizationSection = `
+🧍‍♀️ USER PERSONALIZATION (CRITICAL - Apply to ALL outfits):
+${userBodyShape ? `- Body Shape: ${userBodyShape} - ${getBodyShapeGuidelines(userBodyShape)}` : ''}
+${userUnderTone ? `- Skin Undertone: ${userUnderTone} - ${getUndertoneColorGuidelines(userUnderTone)}` : ''}
+- Height: ${heightDescription} - Choose proportions and lengths that flatter this height
+- All styling choices must consider these physical characteristics for maximum flattery
+- Each outfit should be optimized for this specific body type and coloring
+`;
+
+        // Build model appearance section
+        const modelAppearanceSection = `
+👤 MODEL APPEARANCE REQUIREMENTS:
+- Generate a photorealistic female model with these characteristics:
+  ${userHeight ? `- Height: ${heightDescription} (adjust proportions accordingly)` : ''}
+  ${userBodyShape ? `- Body shape: ${userBodyShape} body type with natural, realistic proportions` : ''}
+  ${userUnderTone ? `- Skin tone: Natural ${userUnderTone} undertone complexion` : ''}
+- Model should have a natural, approachable appearance
+- Professional but relatable fashion model aesthetic
+- Consistent model appearance across all ${numberOfImages} generated images
+`;
+
         const aiPrompt = `
-ROLE: You are a professional fashion stylist creating complete, full-body styled outfits for a fashion editorial campaign.
+ROLE: You are a professional fashion stylist creating complete, full-body styled outfits for a personalized fashion editorial campaign.
 
 OBJECTIVE:
-Design ${numberOfImages} distinct cohesive outfits perfect for a **${occasion}** setting. Create complete looks styled on models for a fashion campaign.
+Design ${numberOfImages} distinct cohesive outfits perfect for a **${occasion}** setting, specifically tailored for the user's body characteristics. Create complete looks styled on a model that represents the user's physical attributes.
 ${descriptionSection}
+${personalizationSection}
+
 ✅ OUTFIT STRUCTURE (for each look):
 - Include EXACTLY ONE complete outfit with:
   - One topwear (shirt, blouse, t-shirt, sweater, etc.)
@@ -24,16 +82,21 @@ ${descriptionSection}
 - Each outfit must be appropriate and stylish for **${occasion}**
 - Make each look distinctly different in style, color palette, and approach
 - Consider the formality level and aesthetic that suits this occasion
-- Focus on creating cohesive, well-coordinated looks
+- Focus on creating cohesive, well-coordinated looks that FLATTER the user's specific body type
 - Ensure variety between the ${numberOfImages} different outfits
+${userBodyShape ? `- All silhouettes and fits must be optimized for ${userBodyShape} body shape` : ''}
+${userUnderTone ? `- All color choices must complement ${userUnderTone} undertones` : ''}
 ${description && description.trim() ? `- Reflect the styling preferences: "${description.trim()}" in each of the ${numberOfImages} looks while maintaining distinct differences between them` : ''}
 
+${modelAppearanceSection}
+
 🖼️ VISUAL OUTPUT FORMAT:
-- Each outfit styled on a photorealistic human **model**
+- Each outfit styled on the personalized photorealistic human model
 - Professional editorial photography look – full-body model shots
 - Clean and neutral background, natural light or soft studio lighting
 - High-resolution fashion-forward appearance
 - Show each complete outfit clearly and attractively
+- Model should consistently represent the user's physical characteristics
 ${description && description.trim() ? `- Ensure the overall visual aesthetic aligns with: "${description.trim()}"` : ''}
 
 🚫 ABSOLUTE RULES:
@@ -41,10 +104,12 @@ ${description && description.trim() ? `- Ensure the overall visual aesthetic ali
 - No styling alternatives within each look
 - No text overlays or descriptions on images
 - Focus on showcasing realistic, wearable outfits
+- Model must consistently reflect the specified physical characteristics
+- All outfit choices must be flattering for the specified body type and coloring
 ${description && description.trim() ? `- All outfits should harmonize with the user's style direction while being distinctly different from each other` : ''}
 
 ✨ GOAL:
-Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitable for the **${occasion}** setting, each styled professionally on a female model${description && description.trim() ? ` with styling that reflects: "${description.trim()}"` : ''}.
+Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitable for the **${occasion}** setting, each styled professionally on a female model who represents the user's physical characteristics${userBodyShape ? ` (${userBodyShape} body shape)` : ''}${userUnderTone ? ` with ${userUnderTone} undertones` : ''} at ${heightDescription} height${description && description.trim() ? `, with styling that reflects: "${description.trim()}"` : ''}.
 `;
 
         const aiResponse = await ai.models.generateContent({
@@ -59,25 +124,21 @@ Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitab
         // Extract AI generated images
         const generatedImages = [];
         let aiImageCount = 0;
-        
+
         for (const part of aiResponse.candidates[0].content.parts) {
             if (part.inlineData) {
                 aiImageCount++;
                 generatedImages.push({
                     type: 'ai_suggestion',
-                    imageB64: part.inlineData.data,
-                    lookNumber: aiImageCount,
-                    description: description || null
+                    imageB64: 'part.inlineData.data'
                 });
             }
         }
 
         return {
             success: true,
-            data: generatedImages,
-            totalGenerated: generatedImages.length,
-            message: `Successfully generated ${generatedImages.length} AI fashion suggestions${description && description.trim() ? ' with custom styling preferences' : ''}`,
-            appliedDescription: description || null
+            imageB64: generatedImages,
+            // totalGenerated: generatedImages.length
         };
 
     } catch (error) {
@@ -85,9 +146,7 @@ Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitab
         return {
             success: false,
             error: error.message,
-            data: [],
-            totalGenerated: 0,
-            message: 'Failed to generate AI fashion suggestions'
+            data: []
         };
     }
 };

@@ -20,7 +20,7 @@ export const styleRecommenderController = async (req, res) => {
         }
 
         // Single merged function call for validation and critique
-        const validationResult = await uploadAndValidateWithCritique(imageFiles, occasion);
+        const validationResult = await uploadAndValidateWithCritique(imageFiles, occasion, req);
         
         if (validationResult.error) {
             return res.status(400).json({ error: validationResult.error });
@@ -35,7 +35,6 @@ export const styleRecommenderController = async (req, res) => {
         } = validationResult;
 
         let modelImage = null;
-        let niceMessage = null;
         let wardrobeImageResponse = null;
         let aiGeneratedImageResponse = null;
 
@@ -43,36 +42,24 @@ export const styleRecommenderController = async (req, res) => {
 
         // Always try to get wardrobe image first
         wardrobeImageResponse = await processWardrobeItemForOccasion(req, occasion, description);
-        results.push(wardrobeImageResponse?.data || null);
+        results.push(wardrobeImageResponse || null);
 
         // Determine how many AI images to generate based on wardrobe availability
         const aiImageCount = wardrobeImageResponse?.data ? 1 : 2;
 
         // Generate content for all cases
-        modelImage = await generateModelImage(imageUrls, occasion, badItemImages, description);
-        results.push(modelImage);
-        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount, description);
-        results.push(aiGeneratedImageResponse?.data || null);
-        
-        // Set message based on match status
-        if (isPerfectMatch) {
-            niceMessage = "Here's your perfectly styled outfit visualized! 💃✨";
-        } else {
-            niceMessage = "Here's your outfit visualized with AI suggestions! 🛍️✨";
-        }
+        modelImage = await generateModelImage(imageUrls, occasion, badItemImages, description, req);
+        results.push(modelImage || null);
+        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount, description, req);
+        results.push(aiGeneratedImageResponse?.imageB64 || null);
 
         res.status(200).json({
             recommendations: critique,
             results,
             occasion,
-            // modelImage,
-            // wardrobeImage: wardrobeImageResponse?.data || null,
-            // aiGeneratedImages: aiGeneratedImageResponse?.data || null,
-            aiImageCount, // Let frontend know how many AI images to expect
-            message: niceMessage,
             badItemImages, // This will be populated for mismatches
             isPerfectMatch, // Added this for frontend logic
-            suitabilityDetails, // Added this for detailed feedback
+            suitabilityDetails // Added this for detailed feedback
         });
 
         // await Promise.all(imageUrls.map(deleteFromCloudinary(url => url)));

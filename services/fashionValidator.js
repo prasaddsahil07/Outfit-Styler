@@ -21,8 +21,43 @@ async function fetchImageAsBase64(url) {
     }
 }
 
-export async function uploadAndValidateWithCritique(files, occasion) {
+// Utility: extract JSON from text response with proper bracket matching
+function extractJsonFromText(text) {
+    const startIndex = text.indexOf('{');
+    if (startIndex === -1) return null;
+    
+    let braceCount = 0;
+    let endIndex = startIndex;
+    
+    for (let i = startIndex; i < text.length; i++) {
+        if (text[i] === '{') {
+            braceCount++;
+        } else if (text[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+                endIndex = i;
+                break;
+            }
+        }
+    }
+    
+    if (braceCount !== 0) return null; // Unmatched braces
+    
+    const jsonString = text.substring(startIndex, endIndex + 1);
+    return [jsonString]; // Return in array format to match the original regex match
+}
+
+export async function uploadAndValidateWithCritique(files, occasion, req) {
     const imageUrls = [];
+
+    const userBodyShape = req.user.userBodyInfo.bodyShape || "";
+    const userUnderTone = req.user.userBodyInfo.undertone || "";
+    
+    // Set default height for women if not provided (average women's height: 5'4")
+    const userHeight = req.user.userBodyInfo.height && 
+                      (req.user.userBodyInfo.height.feet > 0 || req.user.userBodyInfo.height.inches > 0)
+                      ? req.user.userBodyInfo.height 
+                      : { feet: 5, inches: 4 };
 
     // Upload all images first
     for (const file of files) {
@@ -31,7 +66,13 @@ export async function uploadAndValidateWithCritique(files, occasion) {
     }
 
     // Single API call for both validation and critique using Gemini
-    const validationResult = await validateAndCritiqueOutfitWithGemini(imageUrls, occasion);
+    const validationResult = await validateAndCritiqueOutfitWithGemini(
+        imageUrls, 
+        occasion, 
+        userBodyShape, 
+        userUnderTone, 
+        userHeight
+    );
     
     // If any items are invalid fashion items, delete uploaded images and return error
     if (validationResult.hasInvalidFashionItems) {
@@ -59,12 +100,24 @@ export async function uploadAndValidateWithCritique(files, occasion) {
     };
 }
 
-async function validateAndCritiqueOutfitWithGemini(imageUrls, occasion) {
+async function validateAndCritiqueOutfitWithGemini(imageUrls, occasion, bodyShape, undertone, height) {
     const [top, bottom, accessory, footwear] = imageUrls;
     const labels = ['Topwear', 'Bottomwear', 'Accessory', 'Footwear'];
 
+    // Format height for better readability
+    const heightString = `${height.feet}'${height.inches}"`;
+    
+    // Create user profile section for the prompt
+    const userProfile = `
+**USER PROFILE:**
+- Body Shape: ${bodyShape || 'Not specified'}
+- Undertone: ${undertone || 'Not specified'}  
+- Height: ${heightString}`;
+
     try {
         const prompt = `You are a professional fashion stylist and image validation assistant. The user has uploaded 1 to 4 items labeled as: Topwear, Bottomwear, Accessory, and Footwear. The occasion is: ${occasion}.
+
+${userProfile}
 
 Your tasks:
 
@@ -75,26 +128,46 @@ First, validate each uploaded image to ensure it contains a valid fashion item (
 **STEP 2: OUTFIT CRITIQUE** (Only if all items are valid fashion items)
 If all items are valid fashion items, provide:
 
-1. A short fashion critique (within 50 words) about how well the items work together for the given occasion.
+1. A personalized fashion critique (within 60 words) considering the user's body shape, undertone, height, and how well the items work together for the given occasion. Focus on:
+   - How the outfit flatters the user's body shape
+   - Color harmony with the user's undertone
+   - Proportions suitable for the user's height
+   - Appropriateness for the occasion
+
 2. Conclude with either:
    ✅ Perfect Match
    ❌ Not Suitable
 
-3. If ❌ Not Suitable, specify exactly which items are not suitable using this **exact JSON format**, including only the items provided:
+3. **ALWAYS** provide the following JSON format for all items (regardless of Perfect Match or Not Suitable), including only the items provided:
 
 {
-  "Topwear": "suitable" | "not suitable",
-  "Bottomwear": "suitable" | "not suitable", 
-  "Footwear": "suitable" | "not suitable",
-  "Accessory": "suitable" | "not suitable"
+  "Topwear": {
+    "status": "suitable" | "not suitable",
+    "reasoning": "Brief one-line explanation"
+  },
+  "Bottomwear": {
+    "status": "suitable" | "not suitable",
+    "reasoning": "Brief one-line explanation"
+  },
+  "Footwear": {
+    "status": "suitable" | "not suitable",
+    "reasoning": "Brief one-line explanation"
+  },
+  "Accessory": {
+    "status": "suitable" | "not suitable",
+    "reasoning": "Brief one-line explanation"
+  }
 }
 
 ⚠️ Rules:
 - ALWAYS do fashion validation first
+- Consider the user's body profile for personalized advice
 - Only include keys in JSON for items that are provided
 - The critique must come **before** the JSON
+- **ALWAYS include the JSON structure for ALL items, whether Perfect Match or Not Suitable**
 - Do not include any extra commentary outside the JSON
 - The JSON must be valid and appear exactly as shown
+- Each reasoning should be a concise one-liner explaining why the item is suitable/not suitable
 
 Respond strictly in this structure.`;
 
@@ -147,27 +220,41 @@ Respond strictly in this structure.`;
         let badItemIndices = [];
         let suitabilityDetails = null;
 
-        if (!isPerfectMatch) {
-            // Try to extract JSON for unsuitable items
-            const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
-            if (jsonMatch) {
-                try {
-                    suitabilityDetails = JSON.parse(jsonMatch[0]);
-                    
-                    // Get indices of unsuitable items
+        // Try to extract JSON for both suitable and unsuitable items
+        const jsonMatch = extractJsonFromText(responseText);
+        if (jsonMatch) {
+            try {
+                suitabilityDetails = JSON.parse(jsonMatch[0]);
+                
+                if (!isPerfectMatch) {
+                    // Get indices of unsuitable items - now checking the nested status
                     badItemIndices = labels
                         .map((label, index) => ({ label, index }))
                         .filter(({ label, index }) => 
                             imageUrls[index] && 
-                            suitabilityDetails[label] === "not suitable"
+                            suitabilityDetails[label] && 
+                            suitabilityDetails[label].status === "not suitable"
                         )
                         .map(({ index }) => index);
-                } catch (error) {
-                    console.error("Failed to parse suitability JSON:", error);
-                    // Fallback: if JSON parsing fails, assume all items are problematic
+                }
+            } catch (error) {
+                console.error("Failed to parse suitability JSON:", error);
+                // Fallback: if JSON parsing fails and it's not a perfect match, assume all items are problematic
+                if (!isPerfectMatch) {
                     badItemIndices = imageUrls.map((url, index) => url ? index : -1).filter(index => index !== -1);
                 }
             }
+        } else if (isPerfectMatch) {
+            // If it's a perfect match but no JSON found, create default suitable entries
+            suitabilityDetails = {};
+            imageUrls.forEach((url, index) => {
+                if (url && labels[index]) {
+                    suitabilityDetails[labels[index]] = {
+                        status: "suitable",
+                        reasoning: "Perfect match for the occasion and your profile"
+                    };
+                }
+            });
         }
 
         return {

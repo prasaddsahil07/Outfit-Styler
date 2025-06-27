@@ -28,8 +28,25 @@ const userSchema = new mongoose.Schema(
       minlength: [3, "Password must be at least 6 characters"],
     },
     userBodyInfo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "UserBodyInfo",
+      bodyShape: {
+        type: String,
+        enum: ['rectangle', 'hourglass', 'pear', 'apple', 'inverted triangle'],
+      },
+      undertone: {
+        type: String,
+        enum: ['cool', 'warm', 'neutral'],
+      },
+      height: {
+        feet: {
+          type: Number,
+          min: 0,
+        },
+        inches: {
+          type: Number,
+          min: 0,
+          max: 11,
+        }
+      }
     },
     refreshToken: {
       type: String,

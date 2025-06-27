@@ -24,14 +24,13 @@ export const generateImageForOccasion = async (req, res) => {
         } else {
             console.warn("Wardrobe styling failed:", wardrobeResult.error || wardrobeResult.message);
             wardrobeItemsAvailable = wardrobeResult.wardrobeItemsAvailable || 0;
-            // Continue with AI-only generation if wardrobe styling fails
         }
 
         // Generate AI suggestions (2 if wardrobe item exists, 3 if not)
         const numberOfAIImages = wardrobeImageGenerated ? 2 : 3;
         
         // Generate AI fashion suggestions using the service
-        const aiResult = await generateAIFashionSuggestions(occasion, numberOfAIImages);
+        const aiResult = await generateAIFashionSuggestions(occasion, numberOfAIImages, req);
         
         if (aiResult.success) {
             results.push(...aiResult.data);
@@ -42,7 +41,7 @@ export const generateImageForOccasion = async (req, res) => {
 
         return res.status(200).json({
             message: "Images created successfully",
-            results,
+            // results,
             occasion: occasion,
             wardrobeItemUsed: wardrobeImageGenerated,
             totalImages: results.length,
