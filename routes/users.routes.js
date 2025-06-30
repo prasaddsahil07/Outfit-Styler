@@ -6,12 +6,12 @@ import {upload} from "../middleware/multer.middleware.js";
 const router = Router();
 
 // Register a new user
-// router.post("/register", upload.fields([{
-//     name: 'profilePicture',
-//     maxCount: 1
-// }]), registerUser);
+router.post("/register", upload.fields([{
+    name: 'profilePicture',
+    maxCount: 1
+}]), registerUser);
 
-router.post("/register", registerUser);
+// router.post("/register", registerUser);
 // Login a user
 router.post("/login", loginUser);
 // Logout a user
@@ -23,7 +23,10 @@ router.get("/userName", verifyJWT, getUserFullName);
 // Change user password
 router.patch("/change-password", verifyJWT, changeUserPassword);
 // Update user profile
-router.patch("/update-profile", verifyJWT, updateUserProfile);
+router.patch("/update-profile", verifyJWT, upload.fields([{
+    name: "profilePicture", 
+    maxCount: 1 
+}]), updateUserProfile);
 // Refresh access token
 router.post("/refresh-token", refreshAccessToken);
 

@@ -1,4 +1,5 @@
 import { User } from '../models/users.models.js';
+import { DigitalWardrobe } from "../models/digitalWardrobe.models.js"
 import jwt from 'jsonwebtoken';
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js';
 
@@ -28,52 +29,48 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 // register user
 export const registerUser = async (req, res) => {
+    try {
+        const { fullName, email, password } = req.body;
 
-    //getting user data from req
-    const { fullName, email,  password } = req.body  // form-data, json-data is accessed from req.body
+        // Validation
+        if ([fullName, email, password].some((field) => field?.trim() === "")) {
+            return res.status(400).json({ msg: "All fields are required" });
+        }
 
+        // Check for existing user
+        const existedUser = await User.findOne({ $or: [{ email }] });
+        if (existedUser) {
+            return res.status(409).json({ msg: "User already exists" });
+        }
 
-    //validating if any filed is empty
-    if (
-        [fullName, email,  password].some((field) =>
-            field?.trim() === "")
-    ) {
-        return res.status(400).json({ msg: "All fields are required" })
+        // Handle optional profile picture
+        let profilePictureUrl = "";
+        const profilePicFile = req.files?.profilePicture?.[0];
+
+        if (profilePicFile) {
+            const cloudinaryResult = await uploadOnCloudinary(profilePicFile.path); // it returns the URL itself
+            profilePictureUrl = cloudinaryResult || "";
+        }
+
+        // Create new user
+        const user = await User.create({
+            fullName,
+            email,
+            password,
+            profilePicture: profilePictureUrl
+        });
+
+        if (!user) {
+            return res.status(500).json({ msg: "Something went wrong while registering the user" });
+        }
+
+        return res.status(201).json({ data: user, msg: "User registered successfully" });
+
+    } catch (error) {
+        console.error("Registration error:", error);
+        return res.status(500).json({ msg: "Internal server error" });
     }
-
-
-    //checking if user already exits
-    const existedUser = await User.findOne({
-        $or: [{ email }]   // checking if any of these fields are already in the database
-    })
-
-    if (existedUser) {
-        return res.status(409).json({ msg: "user already exits" })
-    }
-
-
-    //creating new user in the database
-    const user = await User.create({
-        fullName,
-        email,
-        password
-    })
-
-
-    // //checking if user created successfully
-    // const createdUser = await User.findById(user._id).select(
-    //     "-password -refreshToken"   // don't pass password and refreshToken from response
-    // )
-
-    //this will return user data if user is founded if not then
-    if (!user) {
-        throw new ApiError(500, "Something went wrong while registering the user")
-    }
-
-    //if user created successfully 
-    return res.status(201).json({ data: user, msg: "User Registered Successfully" });
 };
-
 
 // // original register user
 // export const registerUser = async (req, res) => {
@@ -128,8 +125,7 @@ export const registerUser = async (req, res) => {
 //     return res.status(201).json({ data: user, msg: "User Registered Successfully" });
 // };
 
-
-// login user
+// login user 
 export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
@@ -166,8 +162,6 @@ export const loginUser = async (req, res) => {
         .cookie("refreshToken", refreshToken, options)
         .json({ data: loggedInUser, msg: "User Logged In Successfully" })
 };
-
-
 
 // // login user
 // export const loginUser = async (req, res) => {
@@ -226,7 +220,7 @@ export const logoutUser = async (req, res) => {
         .cookie("accessToken", null, options)
         .cookie("refreshToken", null, options)
         .json({ msg: "User Logged Out Successfully" })
-}
+};
 
 // refresh access token
 export const refreshAccessToken = async (req, res) => {
@@ -258,7 +252,7 @@ export const refreshAccessToken = async (req, res) => {
     } catch (error) {
         return res.status(500).json({ msg: "Something went wrong while refreshing access token" })
     }
-}
+};
 
 // change user password
 export const changeUserPassword = async (req, res) => {
@@ -281,17 +275,49 @@ export const changeUserPassword = async (req, res) => {
     } catch (error) {
         return res.status(500).json({ msg: "Something went wrong while changing password" });
     }
-}
+};
 
 // get user profile
 export const getUserProfile = async (req, res) => {
     try {
         const user = req.user;
-        return res.status(200).json({ data: user });
+
+        if (!user) {
+            return res.status(404).json({ msg: "User not found while fetching profile" });
+        }
+
+        const userId = user._id;
+
+        const wardrobe = await DigitalWardrobe.findOne({ userId });
+
+        let totalGarments = 0;
+        let latestGarmentsImages = [];
+
+        if (wardrobe && wardrobe.uploadedImages?.length) {
+            // Count garments
+            totalGarments = wardrobe.uploadedImages.reduce((total, image) => {
+                return total + (image.garments?.length || 0);
+            }, 0);
+
+            // Get latest 3 images (reversed for most recent)
+            latestGarmentsImages = wardrobe.uploadedImages
+                .slice(-3)
+                .reverse()
+                .map(image => ({ imageUrl: image.imageUrl }));
+        }
+
+        return res.status(200).json({
+            data: user,
+            closetStats: totalGarments,
+            newAdditions: latestGarmentsImages,
+            msg: "User profile fetched successfully"
+        });
+
     } catch (error) {
+        console.error("Error fetching profile:", error);
         return res.status(500).json({ msg: "Something went wrong while fetching user profile" });
     }
-}
+};
 
 // get userName
 export const getUserFullName = async (req, res) => {
@@ -302,90 +328,54 @@ export const getUserFullName = async (req, res) => {
     } catch (error) {
         return res.status(500).json({ msg: "Something went wrong while fetching user name" });
     }
-}
+};
 
 // update user profile
 export const updateUserProfile = async (req, res) => {
     try {
         const user = req.user;
-        if(!user) {
-            return res.status(404).json({ msg: "User not found while updating profile details" });
-        }
-        const { fullName, email, } = req.body;
-
-        if (!fullName || !email ){
-            return res.status(400).json({ msg: "All fields are required" });
+        if (!user) {
+            return res.status(404).json({ msg: "User not found while updating profile" });
         }
 
-        user.fullName = fullName;
-        user.email = email;
+        const { fullName, email, bodyShape, undertone, feet, inches, location } = req.body;
+
+        const profilePicFile = req.files?.profilePicture?.[0];
+
+        if (!fullName && !email && !bodyShape && !undertone && !feet && !inches && !location && !profilePicFile) {
+            return res.status(400).json({ msg: "At least one field or profile picture is required" });
+        }
+
+        // Update basic fields
+        if (fullName) user.fullName = fullName;
+        if (email) user.email = email;
+        if (bodyShape) user.userBodyInfo.bodyShape = bodyShape;
+        if (undertone) user.userBodyInfo.undertone = undertone;
+        if (feet !== undefined) user.userBodyInfo.height.feet = feet;
+        if (inches !== undefined) user.userBodyInfo.height.inches = inches;
+        // if (location) user.location = location;
+
+        // Upload new profile picture if provided
+        if (profilePicFile) {
+            const uploadedUrl = await uploadOnCloudinary(profilePicFile.path);
+            if (!uploadedUrl) {
+                return res.status(500).json({ msg: "Failed to upload profile picture" });
+            }
+
+            // Delete old picture
+            if (user.profilePicture) {
+                await deleteFromCloudinary(user.profilePicture);
+            }
+
+            user.profilePicture = uploadedUrl;
+        }
 
         await user.save({ validateBeforeSave: true });
+
         return res.status(200).json({ msg: "User profile updated successfully", data: user });
+
     } catch (error) {
+        console.error("Error updating profile:", error);
         return res.status(500).json({ msg: "Something went wrong while updating user profile" });
     }
-}
-
-// // original update user profile
-// export const updateUserProfile = async (req, res) => {
-//     try {
-//         const user = req.user;
-//         if(!user) {
-//             return res.status(404).json({ msg: "User not found while updating profile details" });
-//         }
-//         const { fullName, email, username, phone } = req.body;
-
-//         if (!fullName || !email || !username || !phone) {
-//             return res.status(400).json({ msg: "All fields are required" });
-//         }
-
-//         user.fullName = fullName;
-//         user.email = email;
-//         user.username = username.toLowerCase();
-//         user.phone = phone;
-
-//         await user.save({ validateBeforeSave: true });
-//         return res.status(200).json({ msg: "User profile updated successfully", data: user });
-//     } catch (error) {
-//         return res.status(500).json({ msg: "Something went wrong while updating user profile" });
-//     }
-// }
-
-// // original update the user profile picture
-// export const updateUserProfilePicture = async (req, res) => {
-//     try {
-//         const user = req.user;
-//         if (!user) {
-//             return res.status(404).json({ msg: "User not found while updating profile picture" });
-//         }
-
-//         const profilePictureLocalPath = req.file?.profilePicture[0].path;
-
-//         if(!profilePictureLocalPath) {
-//             return res.status(400).json({ msg: "Profile picture is required" });
-//         }
-
-//         const profilePicUrl = await uploadOnCloudinary(profilePictureLocalPath);
-//         if (!profilePicUrl) {
-//             return res.status(500).json({ msg: "Failed to upload profile picture" });
-//         }
-
-//         await deleteFromCloudinary(user.profilePicture); // delete old profile picture from cloudinary
-
-//         const updatedUserProfilePic = await User.findByIdAndUpdate(
-//             user._id,
-//             {
-//             $set: {
-//                 profilePicture: profilePicUrl
-//             }
-//         }, { new: true }).select("-password")
-
-//         res.status(200).json({
-//             msg: "User profile picture updated successfully",
-//         });
-
-//     } catch (error) {
-//         return res.status(500).json({ msg: "Something went wrong while updating user profile picture" });        
-//     }
-// }
+};

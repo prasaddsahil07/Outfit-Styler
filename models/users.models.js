@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password is required!"],
       minlength: [3, "Password must be at least 6 characters"],
     },
+    profilePicture:{
+        type: String,   
+        default: "https://avatar.iran.liara.run/public/81"
+    },
     userBodyInfo: {
       bodyShape: {
         type: String,
