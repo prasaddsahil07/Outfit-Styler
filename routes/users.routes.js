@@ -1,6 +1,6 @@
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { Router } from "express";
-import { registerUser, loginUser, logoutUser, getUserProfile, changeUserPassword, updateUserProfile, refreshAccessToken, getUserFullName } from "../controllers/users.controllers.js";
+import { registerUser, loginUser, logoutUser, getUserProfile, changeUserPassword, updateUserProfile, refreshAccessToken, getUserFullName, forgotPassword, verifyRecoveryCode, resetPassword } from "../controllers/users.controllers.js";
 import {upload} from "../middleware/multer.middleware.js";
 
 const router = Router();
@@ -21,13 +21,19 @@ router.get("/profile", verifyJWT, getUserProfile);
 // Get user fullName
 router.get("/userName", verifyJWT, getUserFullName);
 // Change user password
-router.patch("/change-password", verifyJWT, changeUserPassword);
+router.patch("/changePassword", verifyJWT, changeUserPassword);
 // Update user profile
-router.patch("/update-profile", verifyJWT, upload.fields([{
+router.patch("/updateProfile", verifyJWT, upload.fields([{
     name: "profilePicture", 
     maxCount: 1 
 }]), updateUserProfile);
 // Refresh access token
-router.post("/refresh-token", refreshAccessToken);
+router.post("/refreshToken", refreshAccessToken);
+// forgot password
+router.post("/forgotPassword", forgotPassword);
+// verify recovery code
+router.post("/verifyRecoveryCode", verifyRecoveryCode);
+// reset password
+router.post("/resetPassword", resetPassword);
 
 export default router;

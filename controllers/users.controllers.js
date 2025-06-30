@@ -2,6 +2,8 @@ import { User } from '../models/users.models.js';
 import { DigitalWardrobe } from "../models/digitalWardrobe.models.js"
 import jwt from 'jsonwebtoken';
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js';
+import crypto from "crypto";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -377,5 +379,92 @@ export const updateUserProfile = async (req, res) => {
     } catch (error) {
         console.error("Error updating profile:", error);
         return res.status(500).json({ msg: "Something went wrong while updating user profile" });
+    }
+};
+
+// forgot password
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) return res.status(400).json({ msg: "Email is required" });
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ msg: "User not found" });
+
+        const recoveryCode = crypto.randomInt(100000, 999999).toString(); // 6-digit code
+        const expires = new Date(Date.now() + 10 * 60 * 1000); // expires in 10 minutes
+
+        user.recoveryCode = recoveryCode;
+        user.recoveryCodeExpiresAt = expires;
+        await user.save();
+
+        // Send email (build your utility)
+        await sendEmail({
+            to: user.email,
+            subject: 'Your password reset code',
+            text: `Use this code to reset your password: ${recoveryCode}. It will expire in 10 minutes.`
+        });
+
+        return res.status(200).json({ msg: "Recovery code sent to email" });
+
+    } catch (err) {
+        console.error("Forgot password error:", err);
+        return res.status(500).json({ msg: "Internal Server Error" });
+    }
+};
+
+// verify recovery-code
+export const verifyRecoveryCode = async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user || !user.recoveryCode || !user.recoveryCodeExpiresAt) {
+            return res.status(400).json({ msg: "Invalid or expired recovery code" });
+        }
+
+        if (user.recoveryCode !== code) {
+            return res.status(400).json({ msg: "Incorrect recovery code" });
+        }
+
+        if (user.recoveryCodeExpiresAt < new Date()) {
+            return res.status(400).json({ msg: "Recovery code has expired" });
+        }
+
+        return res.status(200).json({ msg: "Recovery code verified" });
+
+    } catch (err) {
+        console.error("Recovery code verification error:", err);
+        return res.status(500).json({ msg: "Internal Server Error" });
+    }
+};
+
+// reset password
+export const resetPassword = async (req, res) => {
+    try {
+        const { email, code, newPassword, confirmPassword } = req.body;
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ msg: "Passwords do not match" });
+        }
+
+        const user = await User.findOne({ email });
+
+        if (!user || user.recoveryCode !== code || user.recoveryCodeExpiresAt < new Date()) {
+            return res.status(400).json({ msg: "Invalid or expired recovery code" });
+        }
+
+        user.password = newPassword; // Will be hashed in pre-save middleware
+        user.recoveryCode = undefined;
+        user.recoveryCodeExpiresAt = undefined;
+
+        await user.save();
+
+        return res.status(200).json({ msg: "Password reset successfully" });
+
+    } catch (err) {
+        console.error("Reset password error:", err);
+        return res.status(500).json({ msg: "Internal Server Error" });
     }
 };
