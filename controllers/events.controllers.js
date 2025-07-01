@@ -229,6 +229,7 @@ export const getEventDetails = async (req, res) => {
 
 // Modified updateEvent to handle both single events and day events
 export const updateEvent = async (req, res) => {
+    try {
     const { id, dayEventId } = req.params; // id = event ID, dayEventId = optional day event ID
     const {
         title,
@@ -250,7 +251,6 @@ export const updateEvent = async (req, res) => {
         daySpecificImage
     } = req.body;
 
-    try {
         const event = await Event.findById(id);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });

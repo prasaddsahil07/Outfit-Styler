@@ -17,13 +17,13 @@ import cors from "cors";
 
 import eventRoute from "./routes/events.routes.js";
 import userRoute from "./routes/users.routes.js";
-import userBodyInfoRoute from "./routes/userBodyInfo.routes.js";
+// import userBodyInfoRoute from "./routes/userBodyInfo.routes.js";
 import wardrobeRoute from "./routes/digitalWardrobe.routes.js";
 import imageRoute from "./routes/image.js";
 import savedFavouritesRoute from "./routes/savedFavourites.routes.js";
-import fashionNewsRoute from "./routes/homeScreen.routes.js";
-import dailyPostRoute from "./routes/dailyPost.routes.js";
-import instaPostRoute from "./routes/instaPosts.routes.js";
+// import fashionNewsRoute from "./routes/zuriMagazine.routes.js";
+// import dailyPostRoute from "./routes/dailyPost.routes.js";
+// import instaPostRoute from "./routes/instaPosts.routes.js";
 import stylingRoute from "./routes/generateImages.routes.js";
 import styleRecommenderRoute from "./routes/styleRecommender.routes.js";
 // import newsRoute from "./routes/news.js";
@@ -69,12 +69,12 @@ app.use(cors({
 // all routes
 app.use("/api/users", userRoute);
 app.use("/api/events", eventRoute);
-app.use("/api/userBodyInfo", userBodyInfoRoute);
+// app.use("/api/userBodyInfo", userBodyInfoRoute);
 app.use("/api/wardrobe", wardrobeRoute);
 app.use("/api/savedFavourites", savedFavouritesRoute);
-app.use("/api/fashionNews", fashionNewsRoute);
-app.use("/api/dailyPost", dailyPostRoute);
-app.use("/api/instaPosts", instaPostRoute);
+// app.use("/api/fashionNews", fashionNewsRoute);
+// app.use("/api/dailyPost", dailyPostRoute);
+// app.use("/api/instaPosts", instaPostRoute);
 app.use("/api/styleRecommender", styleRecommenderRoute);
 app.use("/api/styling", stylingRoute);
 // app.use("/api/fashion", newsRoute);

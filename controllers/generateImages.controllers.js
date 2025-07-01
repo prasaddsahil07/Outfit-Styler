@@ -27,26 +27,26 @@ export const generateImageForOccasion = async (req, res) => {
         }
 
         // Generate AI suggestions (2 if wardrobe item exists, 3 if not)
-        const numberOfAIImages = wardrobeImageGenerated ? 2 : 3;
+        // const numberOfAIImages = wardrobeImageGenerated ? 2 : 3;
         
-        // Generate AI fashion suggestions using the service
-        const aiResult = await generateAIFashionSuggestions(occasion, numberOfAIImages, req);
+        // // Generate AI fashion suggestions using the service
+        // const aiResult = await generateAIFashionSuggestions(occasion, numberOfAIImages, req);
         
-        if (aiResult.success) {
-            results.push(...aiResult.data);
-            console.log(`Generated ${aiResult.totalGenerated} AI fashion suggestions`);
-        } else {
-            console.warn("AI image generation failed:", aiResult.error || aiResult.message);
-        }
+        // if (aiResult.success) {
+        //     results.push(...aiResult.data);
+        //     console.log(`Generated ${aiResult.totalGenerated} AI fashion suggestions`);
+        // } else {
+        //     console.warn("AI image generation failed:", aiResult.error || aiResult.message);
+        // }
 
         return res.status(200).json({
             message: "Images created successfully",
-            // results,
+            results,
             occasion: occasion,
             wardrobeItemUsed: wardrobeImageGenerated,
             totalImages: results.length,
             wardrobeItemsAvailable: wardrobeItemsAvailable,
-            aiSuggestionsGenerated: aiResult.success ? aiResult.totalGenerated : 0
+            // aiSuggestionsGenerated: aiResult.success ? aiResult.totalGenerated : 0
         });
 
     } catch (err) {

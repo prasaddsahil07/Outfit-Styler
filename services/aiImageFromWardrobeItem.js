@@ -82,17 +82,20 @@ export const generateWardrobeStyledImage = async (selectedGarment, occasion, des
         // Convert image to base64
         const base64Image = await convertImageToBase64(selectedGarment.imageUrl);
 
-        const userBodyShape = req.user.userBodyInfo.bodyShape || "";
-        const userUnderTone = req.user.userBodyInfo.undertone || "";
+        // const userBodyShape = req.user.userBodyInfo.bodyShape || "";
+        // const userUnderTone = req.user.userBodyInfo.undertone || "";
+        const userBodyShape = "apple";
+        const userUnderTone = "pale";
 
         // Set default height for women if not provided (average women's height: 5'4")
-        const userHeight = req.user.userBodyInfo.height &&
-            (req.user.userBodyInfo.height.feet > 0 || req.user.userBodyInfo.height.inches > 0)
-            ? req.user.userBodyInfo.height
-            : { feet: 5, inches: 4 };
+        // const userHeight = req.user.userBodyInfo.height &&
+        //     (req.user.userBodyInfo.height.feet > 0 || req.user.userBodyInfo.height.inches > 0)
+        //     ? req.user.userBodyInfo.height
+        //     : { feet: 5, inches: 4 };
 
         // Format height for better readability
-        const heightString = `${userHeight.feet}'${userHeight.inches}"`;
+        // const heightString = `${userHeight.feet}'${userHeight.inches}"`;
+        const heightString = "5.4'";
 
         // Build user profile section for the prompt
         const userProfile = `
@@ -202,13 +205,6 @@ Create a realistic visualization showing how the user's wardrobe item would look
                         imageB64: part.inlineData.data,
                         itemName: selectedGarment.itemName,
                         itemId: selectedGarment.imageId,
-                        description: description || null,
-                        userProfile: {
-                            bodyShape: userBodyShape,
-                            height: heightString,
-                            undertone: userUnderTone
-                        },
-                        occasion: occasion
                     }
                 };
             }
@@ -230,10 +226,10 @@ export const processWardrobeItemForOccasion = async (req, occasion, description 
     try {
         // Get wardrobe items for the occasion
         const wardrobeItems = await getGarmentsFromWardrobe(req, occasion);
-
+        console.log("After wardrobeItems");
         if (wardrobeItems.length === 0) {
             return {
-                // success: false,
+                success: false,
                 type: 'wardrobe',
                 imageB64: null,
             };
@@ -241,21 +237,24 @@ export const processWardrobeItemForOccasion = async (req, occasion, description 
 
         // Select a wardrobe item using rotation logic
         const selectedGarment = selectWardrobeItem(wardrobeItems, req.user._id, occasion);
-
+        console.log("After selectgarment");
         // Generate styled image with optional description
         const result = await generateWardrobeStyledImage(selectedGarment, occasion, description, req);
-
+        console.log("printing result", result.data.type);
+        
         if (result.success) {
             return {
-                // success: true,
-                type: 'wardrobe',
-                imageB64: 'result.data',
+                success: true,
+                type: result.data.type,
+                imageB64: 'result.data.imageB64',
+                aiDescription: result.data.aiDescription
             };
         } else {
             return {
-                // success: false,
-                type: 'wardrobe',
+                success: false,
+                type: result.data.type,
                 imageB64: result.error,
+                aiDescription: result.data.aiDescription
             };
         }
 
