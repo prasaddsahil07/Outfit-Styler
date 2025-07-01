@@ -24,7 +24,7 @@ export const addToSavedFavourites = async (req, res) => {
         }
 
         // Create a new saved favourite
-        await SavedFavourites.create({
+        const savedFavouriteImage = await SavedFavourites.create({
             userId,
             imageUrl,
             tag,
@@ -32,10 +32,10 @@ export const addToSavedFavourites = async (req, res) => {
             description
         });
 
-        return res.status(201).json({ message: "Image added to saved favourites successfully" });
+        return res.status(201).json({ data: savedFavouriteImage, msg: "Image added to saved favourites successfully" });
     } catch (error) {
         console.log("Error while adding to saved favourites:", error);
-        return res.status(500).json({ message: "Error while adding to saved favourites" });
+        return res.status(500).json({ msg: "Error while adding to saved favourites" });
     }
 };
 
@@ -43,19 +43,19 @@ export const getSavedFavourites = async (req, res) => {
     try {
         const userId = req.user._id;
         if (!userId) {
-            return res.status(400).json({ message: "User unauthorized to access this feature" });
+            return res.status(400).json({ msg: "User unauthorized to access this feature" });
         }
 
         const savedFavourites = await SavedFavourites.find({ userId });
 
         if (!savedFavourites || savedFavourites.length === 0) {
-            return res.status(404).json({ message: "No saved favourites found" });
+            return res.status(404).json({ msg: "No saved favourites found" });
         }
 
-        return res.status(200).json({ message: "Favourites fetched successfully", count: savedFavourites.length, savedFavourites });
+        return res.status(200).json({ msg: "Favourites fetched successfully", count: savedFavourites.length, savedFavourites });
     } catch (error) {
         console.log("Error while fetching saved favourites:", error);
-        return res.status(500).json({ message: "Error while fetching saved favourites" });
+        return res.status(500).json({ msg: "Error while fetching saved favourites" });
     }
 };
 
@@ -65,24 +65,24 @@ export const deleteSavedFavourite = async (req, res) => {
         const { favouriteId } = req.params;
 
         if (!userId) {
-            return res.status(400).json({ message: "User unauthorized to access this feature" });
+            return res.status(400).json({ msg: "User unauthorized to access this feature" });
         }
 
         if (!favouriteId) {
-            return res.status(400).json({ message: "Favourite ID is required" });
+            return res.status(400).json({ msg: "Favourite ID is required" });
         }
 
         const savedFavourite = await SavedFavourites.findOne({ _id: favouriteId, userId });
         if (!savedFavourite) {
-            return res.status(404).json({ message: "Saved favourite not found" });
+            return res.status(404).json({ msg: "Saved favourite not found" });
         }
 
         await deleteFromCloudinary(savedFavourite.imageUrl);
         await SavedFavourites.deleteOne({ _id: favouriteId });
 
-        return res.status(200).json({ message: "Saved favourite deleted successfully" });
+        return res.status(200).json({ msg: "Saved favourite deleted successfully" });
     } catch (error) {
         console.log("Error while deleting saved favourite:", error);
-        return res.status(500).json({ message: "Error while deleting saved favourite" });
+        return res.status(500).json({ msg: "Error while deleting saved favourite" });
     }
 };

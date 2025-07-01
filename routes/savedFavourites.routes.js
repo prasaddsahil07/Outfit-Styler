@@ -5,7 +5,7 @@ import { upload } from '../middleware/multer.middleware.js';
 
 const router = Router();
 
-router.post('/addFavourite', verifyJWT, upload.array(5), addToSavedFavourites);
+router.post('/addFavourite', verifyJWT, upload.array('files', 5), addToSavedFavourites);
 router.get('/getFavourites', verifyJWT, getSavedFavourites);
 router.delete('/deleteFavourite/:favouriteId', verifyJWT, deleteSavedFavourite);
 
