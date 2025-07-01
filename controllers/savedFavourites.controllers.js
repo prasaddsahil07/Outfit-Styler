@@ -7,20 +7,20 @@ export const addToSavedFavourites = async (req, res) => {
     try {
         const userId = req.user._id;
         if (!userId) {
-            return res.status(400).json({ message: "User unauthorized to access this feature" });
+            return res.status(400).json({ msg: "User unauthorized to access this feature" });
         }
 
         const { tag, occasion, description } = req.body;
         const file = req.files?.[0];
 
         if (!file || !tag || !occasion || !description) {
-            return res.status(400).json({ message: "All fields are required including image file" });
+            return res.status(400).json({ msg: "All fields are required including image file" });
         }
 
         // Upload image file to Cloudinary
         const imageUrl = await uploadOnCloudinary(file.path);
         if (!imageUrl) {
-            return res.status(500).json({ message: "Error uploading image to Cloudinary from saved favourites" });
+            return res.status(500).json({ msg: "Error uploading image to Cloudinary from saved favourites" });
         }
 
         // Create a new saved favourite
