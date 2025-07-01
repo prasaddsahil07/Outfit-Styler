@@ -52,7 +52,7 @@ export const getSavedFavourites = async (req, res) => {
             return res.status(404).json({ msg: "No saved favourites found" });
         }
 
-        return res.status(200).json({ msg: "Favourites fetched successfully", count: savedFavourites.length, savedFavourites });
+        return res.status(200).json({ msg: "Favourites fetched successfully", count: savedFavourites.length, data: savedFavourites });
     } catch (error) {
         console.log("Error while fetching saved favourites:", error);
         return res.status(500).json({ msg: "Error while fetching saved favourites" });
