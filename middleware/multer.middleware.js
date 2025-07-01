@@ -9,4 +9,4 @@ const storage = multer.diskStorage({
     }
 })
 
-export const upload = multer({ storage }); // Allow multiple files, max 5
+export const upload = multer({ storage }); // Allow multiple files
