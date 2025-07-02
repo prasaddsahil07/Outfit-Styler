@@ -5,3 +5,102 @@ We can incorporate the user body profile data so that the generated model can ma
 Using mannequins/models is useful, it takes care of the multiple combo issue.
 Instead of random models, can't we use actual person as a model.
 Pop up notification to upload more images in digital wardrobe(once they logged in and don't have sufficient items in wardrobe , say < 10)
+
+
+
+
+so this is the setup after following the initial instructions from next.js(15) documentation. you need to build on top of this, so the goal is clear and simple, in my main flutter application i have a module called zuri magazine where users can see articles and filter them based on category and read the articles as well, so that part is finished and working well, now i just wanted to build a simple admin kind of website(no requirement for authentication since only admin have access of it) there on the website there are mainly two functionality right now, i) publishing articles in a certain format(as per the backend schema), performing CRUD operation on them and ii) publishing notification in a structured format . The notification part we'll take care later but currently i'm interested in the articles part, so as per my instructions write the code, let me share the db schema with you:
+const zuriMagazineSchema = new mongoose.Schema({
+    authorProfilePic: {
+        type: String,
+        default: "https://avatar.iran.liara.run/public/97"
+    },
+    authorName: {
+        type: String,
+        required: true
+    },
+    category: {
+        type: String,
+        required: true
+    },
+    title: {
+        type: String,
+        required: true
+    },
+    content: {
+        type: String,
+        required: true
+    },
+    subTitle: {
+        type: String
+    },
+    bannerImage: {
+        type: String
+    },
+    tags: {
+        type: [String],
+        default: []
+    }
+}, { timestamps: true });
+
+zuriMagazineSchema.pre('save', function (next) {
+    if (this.category) {
+        this.category = this.category.toLowerCase();
+    }
+    next();
+});
+
+zuriMagazineSchema.pre('findOneAndUpdate', function (next) {
+    const update = this.getUpdate();
+    if (update?.category) {
+        update.category = update.category.toLowerCase();
+        this.setUpdate(update);
+    }
+    next();
+});
+
+
+export const ZuriMagazine = mongoose.model('ZuriMagazine', zuriMagazineSchema);
+
+keep in mind that we are using the same DB (what i'm using in the main project, it's mongodb atlas) , let me share the folder structure suggested by chatgpt as well:
+zuri-admin/
+│
+├── app/                            
+│   ├── layout.tsx                  # Common layout for all pages
+│   ├── page.tsx                    # Redirect or dashboard (e.g., to /articles)
+│
+│   ├── articles/                   # Main section for managing articles
+│   │   ├── page.tsx                # Show all articles (list view)
+│   │   ├── create/                 
+│   │   │   └── page.tsx            # Create new article
+│   │   ├── edit/
+│   │   │   └── [id]/               
+│   │   │       └── page.tsx        # Edit article with dynamic route
+│   │   └── [id]/                   
+│   │       └── page.tsx            # Optional: View single article
+│
+├── components/                     # Reusable UI components
+│   ├── ArticleForm.tsx             # Form used for create/edit
+│   ├── ArticleCard.tsx             # Display article preview in list
+│   └── Header.tsx                  
+│
+├── lib/                            
+│   ├── api.ts                      # Axios/fetch wrapper for API requests
+│   └── utils.ts                    # Optional helpers
+│
+├── types/                          
+│   └── article.d.ts                # TypeScript types for articles
+│
+├── public/                         # Static assets (if needed)
+│   └── defaultBanner.jpg           
+│
+├── styles/
+│   └── globals.css                 # Global CSS (Tailwind base)
+│
+├── tailwind.config.ts
+├── tsconfig.json
+├── next.config.js
+├── .env.local                      # For storing base API URL etc.
+├── package.json
+└── README.md
+if you have any doubt just ask me before start coding or else just start coding

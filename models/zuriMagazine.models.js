@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 const zuriMagazineSchema = new mongoose.Schema({
     authorProfilePic: {
         type: String,

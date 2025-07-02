@@ -1,67 +1,102 @@
 import { ZuriMagazine } from "../models/zuriMagazine.models.js";
-import { uploadToCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 // Create a new article
 export const addArticle = async (req, res) => {
   try {
     const { authorName, category, title, content, subTitle, tags } = req.body;
-    const imageFile = req.file;
+    const files = req.files;
 
     if (!authorName || !category || !title || !content) {
       return res.status(400).json({ msg: "Required fields are missing" });
     }
 
+    let authorProfilePic = undefined;
     let bannerImage = undefined;
-    if (imageFile) {
-      const result = await uploadToCloudinary(imageFile.path);
+
+    // Handle author profile pic upload
+    if (files && files.authorProfilePic && files.authorProfilePic[0]) {
+      const result = await uploadOnCloudinary(files.authorProfilePic[0].path);
+      authorProfilePic = result;
+    }
+
+    // Handle banner image upload
+    if (files && files.bannerImage && files.bannerImage[0]) {
+      const result = await uploadOnCloudinary(files.bannerImage[0].path);
       bannerImage = result;
+    }
+
+    // Parse tags from JSON string if it exists
+    let parsedTags = [];
+    if (tags) {
+      try {
+        parsedTags = JSON.parse(tags);
+      } catch (error) {
+        // Fallback to comma-separated parsing
+        parsedTags = tags.split(",").map((tag) => tag.trim());
+      }
     }
 
     const newArticle = await ZuriMagazine.create({
       authorName,
+      authorProfilePic,
       category: category.toLowerCase(),
       title,
       content,
       subTitle,
       bannerImage,
-      tags: tags ? tags.split(",").map((tag) => tag.trim()) : []
+      tags: parsedTags
     });
 
-    return res.status(201).json({ msg: "Article created", data: newArticle });
+    return res.status(201).json({ msg: "Article created successfully", data: newArticle });
   } catch (error) {
     console.error("Error adding article:", error);
     return res.status(500).json({ msg: "Internal Server Error" });
   }
 };
 
-// Update an existing article
+// Update an existing article (excluding author details)
 export const updateArticle = async (req, res) => {
   try {
     const { id } = req.params;
-    const { authorName, category, title, content, subTitle, tags } = req.body;
+    const { category, title, content, subTitle, tags } = req.body;
     const imageFile = req.file;
 
     const existing = await ZuriMagazine.findById(id);
-    if (!existing) return res.status(404).json({ msg: "Article not found" });
+    if (!existing) {
+      return res.status(404).json({ msg: "Article not found" });
+    }
 
+    // Handle banner image update
     if (imageFile) {
+      // Delete old banner image if exists
       if (existing.bannerImage) {
         await deleteFromCloudinary(existing.bannerImage);
       }
-      const result = await uploadToCloudinary(imageFile.path);
+      const result = await uploadOnCloudinary(imageFile.path);
       existing.bannerImage = result;
     }
 
-    existing.authorName = authorName || existing.authorName;
-    existing.category = category ? category.toLowerCase() : existing.category;
-    existing.title = title || existing.title;
-    existing.content = content || existing.content;
-    existing.subTitle = subTitle || existing.subTitle;
-    existing.tags = tags ? tags.split(",").map((tag) => tag.trim()) : existing.tags;
+    // Update only allowed fields (excluding authorName and authorProfilePic)
+    if (category) existing.category = category.toLowerCase();
+    if (title) existing.title = title;
+    if (content) existing.content = content;
+    if (subTitle !== undefined) existing.subTitle = subTitle; // Allow empty string
+    
+    if (tags) {
+      let parsedTags = [];
+      try {
+        parsedTags = JSON.parse(tags);
+      } catch (error) {
+        // Fallback to comma-separated parsing
+        parsedTags = tags.split(",").map((tag) => tag.trim());
+      }
+      existing.tags = parsedTags;
+    }
 
     await existing.save();
 
-    return res.status(200).json({ msg: "Article updated", data: existing });
+    return res.status(200).json({ msg: "Article updated successfully", data: existing });
   } catch (error) {
     console.error("Error updating article:", error);
     return res.status(500).json({ msg: "Internal Server Error" });
