@@ -6,10 +6,7 @@ import {
   updateGarment, 
   deleteGarment, 
   getGarmentsByCategory, 
-  // getGarmentsByFabric, 
-  // getGarmentsByOccasion, 
-  // getGarmentsBySeason,
-  // getGarmentsByColor,
+  getWardrobeStats,
   filterGarments,
   getCategoryCounts ,
   getGarmentDetails
@@ -18,6 +15,9 @@ import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 
 const router = Router();
+
+// wardrobe stats
+router.get("/wardrobeStats", verifyJWT, getWardrobeStats);
 
 // Category counts
 router.get("/categoryCounts", verifyJWT, getCategoryCounts);

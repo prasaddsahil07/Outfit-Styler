@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const savedFavouritesImage = new mongoose.Schema({
+const uploadedLooksSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -11,17 +11,7 @@ const savedFavouritesImage = new mongoose.Schema({
         required: true,
         trim: true
     },
-    tag: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    occasion: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    description: {
+    title: {
         type: String,
         required: true,
         trim: true
@@ -30,4 +20,6 @@ const savedFavouritesImage = new mongoose.Schema({
     timestamps: true
 });
 
-export const SavedFavourites = mongoose.model("SavedFavourites", savedFavouritesImage);
+uploadedLooksSchema.index({ userId: 1, imageUrl: 1 }, { unique: true });
+
+export const UploadedLooks = mongoose.model("UploadedLooks", uploadedLooksSchema);
