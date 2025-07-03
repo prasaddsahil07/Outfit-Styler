@@ -21,7 +21,7 @@ async function fetchImageAsBase64(url) {
 }
 
 export async function analyzeImage(imageUrl, userQuery = '') {
-    const contextualGuidance = userQuery 
+    const contextualGuidance = userQuery
         ? `\n\nUSER CONTEXT: "${userQuery}"\nWhen generating the fashion title, consider this user input to provide relevant context and perspective. Tailor the title to align with what the user is asking about or looking for.`
         : '';
 
@@ -63,7 +63,11 @@ Analyze the image now:`;
     const result = await ai.models.generateContent({
         model: 'gemini-2.0-flash-thinking-exp',
         contents: [contents],
-        config: { temperature: 0.3 }
+        config: {
+            temperature: 0.1,
+            topP: 0.8,
+            topK: 40,
+        },
     });
 
     const response = JSON.parse(result.candidates[0].content.parts[0].text);
