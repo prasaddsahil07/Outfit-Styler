@@ -1,5 +1,5 @@
-import { UploadedLooks } from "../models/uploadedLooksModel.js";
-import { validateChatbotImage } from "../services/validateChatbotImage.js";
+import { UploadedLooks } from "../models/uploadedLooks.models.js";
+import { validateChatbotImage } from "../services/validateChatbotImages.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { addToWardrobe } from "../services/addToWardrobe.js";
 

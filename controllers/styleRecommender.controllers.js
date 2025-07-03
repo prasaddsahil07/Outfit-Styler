@@ -2,6 +2,7 @@ import { uploadAndValidateWithCritique } from "../services/fashionValidator.js";
 import { generateModelImage } from "../services/mannequinGenerator.js";
 import { processWardrobeItemForOccasion } from "../services/aiImageFromWardrobeItem.js";
 import { generateAIFashionSuggestions } from "../services/aiImageGeneration.js";
+import { analyzeGeneratedAndBadImages } from "../services/imageAnalysisService.js";
 
 // import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
@@ -53,13 +54,23 @@ export const styleRecommenderController = async (req, res) => {
         aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount, description, req);
         results.push(aiGeneratedImageResponse?.imageB64 || null);
 
+        // Analyze generated images and bad images with AI
+        let imageAnalysis = null;
+        try {
+            imageAnalysis = await analyzeGeneratedAndBadImages(results, badItemImages, occasion);
+        } catch (error) {
+            console.error("Error analyzing images:", error);
+            // Continue without image analysis if it fails
+        }
+
         res.status(200).json({
             recommendations: critique,
             results,
             occasion,
             badItemImages, // This will be populated for mismatches
             isPerfectMatch, // Added this for frontend logic
-            suitabilityDetails // Added this for detailed feedback
+            suitabilityDetails, // Added this for detailed feedback
+            imageAnalysis // New field with AI analysis of generated and bad images
         });
 
         // await Promise.all(imageUrls.map(deleteFromCloudinary(url => url)));

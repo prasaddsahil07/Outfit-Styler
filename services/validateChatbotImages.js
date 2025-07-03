@@ -20,7 +20,7 @@ async function fetchImageAsBase64(url) {
     }
 }
 
-export async function analyzeImage(imageUrl, userQuery = '') {
+export async function validateChatbotImage(imageUrl, userQuery = '') {
     const contextualGuidance = userQuery
         ? `\n\nUSER CONTEXT: "${userQuery}"\nWhen generating the fashion title, consider this user input to provide relevant context and perspective. Tailor the title to align with what the user is asking about or looking for.`
         : '';

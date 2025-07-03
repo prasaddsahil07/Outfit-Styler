@@ -1,6 +1,6 @@
 import { extractClothingMetadata } from "../index.js";
 import { DigitalWardrobe } from "../models/digitalWardrobe.models.js";
-import { processWardrobeImages } from '../services/addToWardrobe.js';
+import { addToWardrobe } from '../services/addToWardrobe.js';
 import { User } from "../models/users.models.js";
 import fs from 'fs/promises';
 import crypto from 'crypto';
@@ -186,7 +186,7 @@ export const addGarmentToDigitalWardrobe = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const { processed, skipped, total } = await processWardrobeImages(userId, files);
+    const { processed, skipped, total } = await addToWardrobe(userId, files);
 
     return res.status(200).json({
       message: `Processing complete. ${processed} images added, ${skipped} skipped (duplicates)`,
