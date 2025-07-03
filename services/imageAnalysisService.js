@@ -1,10 +1,22 @@
 import { ai } from "../index.js";
 import { createUserContent } from "@google/genai";
 
-// Convert image URL to base64 inline data
-async function fetchImageAsBase64(url) {
+// Convert image URL to base64 inline data OR handle existing base64
+async function processImageData(imageSource) {
     try {
-        const response = await fetch(url);
+        // Check if it's already a base64 string
+        if (imageSource.startsWith('data:image/')) {
+            // Extract mime type and data from base64 string
+            const [header, data] = imageSource.split(',');
+            const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+            return {
+                mimeType,
+                data
+            };
+        }
+        
+        // If it's a URL, fetch it
+        const response = await fetch(imageSource);
         if (!response.ok) {
             throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
         }
@@ -15,7 +27,7 @@ async function fetchImageAsBase64(url) {
             data: Buffer.from(buffer).toString("base64"),
         };
     } catch (error) {
-        console.error(`Error fetching image from ${url}:`, error);
+        console.error(`Error processing image from ${imageSource}:`, error);
         throw error;
     }
 }
@@ -74,11 +86,26 @@ Analyze the images now:`;
         if (results && results.length > 0) {
             for (let i = 0; i < results.length; i++) {
                 const result = results[i];
-                if (result && (result.imageUrl || result.imageB64)) {
-                    const imageUrl = result.imageUrl || result.imageB64;
+                if (result) {
+                    // Handle different possible image formats
+                    let imageUrl = null;
+                    
+                    if (typeof result === 'string') {
+                        // If result is directly a base64 string or URL
+                        imageUrl = result;
+                    } else if (result.imageUrl) {
+                        imageUrl = result.imageUrl;
+                    } else if (result.imageB64) {
+                        imageUrl = result.imageB64;
+                    } else if (result.data && result.data.imageUrl) {
+                        imageUrl = result.data.imageUrl;
+                    } else if (result.data && result.data.imageB64) {
+                        imageUrl = result.data.imageB64;
+                    }
+                    
                     if (imageUrl) {
                         try {
-                            const imageData = await fetchImageAsBase64(imageUrl);
+                            const imageData = await processImageData(imageUrl);
                             parts.push({
                                 inlineData: imageData
                             });
@@ -96,7 +123,7 @@ Analyze the images now:`;
                 const badImage = badImages[i];
                 if (badImage && badImage.imageUrl) {
                     try {
-                        const imageData = await fetchImageAsBase64(badImage.imageUrl);
+                        const imageData = await processImageData(badImage.imageUrl);
                         parts.push({
                             inlineData: imageData
                         });
@@ -130,13 +157,25 @@ Analyze the images now:`;
         if (results && results.length > 0) {
             for (let i = 0; i < results.length; i++) {
                 const result = results[i];
-                if (result && (result.imageUrl || result.imageB64)) {
-                    const analysisData = response.generatedImages[enhancedResponse.generatedImages.length] || {};
-                    enhancedResponse.generatedImages.push({
-                        ...result, // Include original image data
-                        brief: analysisData.brief || "",
-                        keywords: analysisData.keywords || []
-                    });
+                if (result) {
+                    // Handle different possible image formats
+                    let hasImage = false;
+                    
+                    if (typeof result === 'string') {
+                        hasImage = true;
+                    } else if (result.imageUrl || result.imageB64 || 
+                              (result.data && (result.data.imageUrl || result.data.imageB64))) {
+                        hasImage = true;
+                    }
+                    
+                    if (hasImage) {
+                        const analysisData = response.generatedImages[enhancedResponse.generatedImages.length] || {};
+                        enhancedResponse.generatedImages.push({
+                            ...result, // Include original image data (whatever format it's in)
+                            brief: analysisData.brief || "",
+                            keywords: analysisData.keywords || []
+                        });
+                    }
                 }
             }
         }
