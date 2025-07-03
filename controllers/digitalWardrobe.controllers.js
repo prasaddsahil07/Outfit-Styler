@@ -1,5 +1,6 @@
 import { extractClothingMetadata } from "../index.js";
 import { DigitalWardrobe } from "../models/digitalWardrobe.models.js";
+import { processWardrobeImages } from '../services/addToWardrobe.js';
 import { User } from "../models/users.models.js";
 import fs from 'fs/promises';
 import crypto from 'crypto';
@@ -171,116 +172,27 @@ export const getCategoryCounts = async (req, res) => {
 };
 
 // for handling duplicates items in wardrobe
-function generateImageHash(buffer) {
+export function generateImageHash(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 };
 
-// add garment to wardrobe
+// to add items into the wardrobe
 export const addGarmentToDigitalWardrobe = async (req, res) => {
   try {
     const userId = req.user._id;
     const files = req.files || (req.file ? [req.file] : []);
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
     if (!files.length) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    let processedCount = 0;
-    let skippedCount = 0;
-
-    for (const file of files) {
-      try {
-        const imageBuffer = await fs.readFile(file.path);
-        const imageHash = generateImageHash(imageBuffer);
-
-        const existingWardrobe = await DigitalWardrobe.findOne({
-          userId,
-          "uploadedImages.imageHash": imageHash
-        });
-
-        if (existingWardrobe) {
-          skippedCount++;
-          console.log(`Image ${file.filename} already exists, skipping...`);
-          continue;
-        }
-
-        const base64Image = imageBuffer.toString("base64");
-        const metadata = await extractClothingMetadata(base64Image, file.mimetype);
-
-        if (!metadata || !Array.isArray(metadata) || metadata.length === 0) {
-          console.error(`Failed to extract metadata for ${file.filename}`);
-          continue;
-        }
-
-        const imageUrl = await uploadOnCloudinary(file.path);
-        if (!imageUrl) {
-          console.error(`Failed to upload ${file.filename} to cloudinary`);
-          continue;
-        }
-
-        const garments = metadata
-          .filter(item => item && item.itemName && item.category && item.color?.name && item.color?.hex && item.fabric)
-          .map(item => ({
-            itemName: item.itemName.trim(),
-            category: item.category,
-            color: {
-              name: item.color.name.trim(),
-              hex: item.color.hex.trim()
-            },
-            fabric: item.fabric,
-            occasion: Array.isArray(item.occasion)
-              ? item.occasion.slice(0, 3).map(occ => occ.trim())
-              : [item.occasion?.trim()].filter(Boolean).slice(0, 3),
-            season: Array.isArray(item.season)
-              ? item.season.slice(0, 2)
-              : [item.season].filter(Boolean).slice(0, 2)
-          }));
-
-        if (garments.length === 0) {
-          console.error(`No valid garments found in ${file.filename}`);
-          continue;
-        }
-
-        const imageEntry = {
-          imageUrl,
-          imageHash,
-          garments,
-          createdAt: new Date()
-        };
-
-        await DigitalWardrobe.findOneAndUpdate(
-          { userId },
-          { $push: { uploadedImages: imageEntry } },
-          { upsert: true, new: true }
-        );
-
-        processedCount++;
-        console.log(`Successfully processed ${file.filename} with ${garments.length} garments`);
-
-      } catch (fileError) {
-        console.error(`Error processing file ${file.filename}:`, fileError);
-        continue;
-      } finally {
-        try {
-          await fs.unlink(file.path);
-        } catch (unlinkError) {
-          console.error(`Failed to delete temporary file ${file.path}:`, unlinkError);
-        }
-      }
-    }
-
-    const responseMessage = `Processing complete. ${processedCount} images added, ${skippedCount} images skipped (duplicates)`;
+    const { processed, skipped, total } = await processWardrobeImages(userId, files);
 
     return res.status(200).json({
-      message: responseMessage,
-      processed: processedCount,
-      skipped: skippedCount,
-      total: files.length
+      message: `Processing complete. ${processed} images added, ${skipped} skipped (duplicates)`,
+      processed,
+      skipped,
+      total
     });
 
   } catch (error) {

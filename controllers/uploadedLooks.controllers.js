@@ -1,42 +1,71 @@
 import { UploadedLooks } from "../models/uploadedLooksModel.js";
 import { validateChatbotImage } from "../services/validateChatbotImage.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
+import { processWardrobeImages } from "../services/addToWardrobe.js";
 
 export const addUploadedLook = async (req, res) => {
     const user = req.user;
     const imageFile = req.file;
 
     if (!user || !imageFile) {
-        return res.status(400).json({ message: "User or image URL is missing" });
+        return res.status(400).json({ message: "User or image file is missing" });
     }
 
     try {
+        // Step 1: Upload to Cloudinary
         const imageUrl = await uploadOnCloudinary(imageFile.path);
         if (!imageUrl) {
             return res.status(500).json({ message: "Error uploading image to Cloudinary" });
         }
+
+        // Step 2: Validate image for fashion + full body
         const validationResult = await validateChatbotImage(imageUrl);
         const { containsFullBodyHuman, generatedTitle, containsFashionItem } = validationResult;
 
+        // Step 3: If not a full-body human, skip uploaded look
         if (!containsFullBodyHuman) {
-            console.log("Image does not contain a full-body human, skipping upload");
-            await deleteFromCloudinary(imageUrl); // clean up
-            return res.status(204).json({ message: "Does not contain a human body", data: null, validForWardrobe: containsFashionItem });
+            console.log("Image does not contain a full-body human, skipping uploaded look");
+            await deleteFromCloudinary(imageUrl); // cleanup
+            return res.status(204).json({ 
+                message: "Image skipped: no full-body human",
+                data: null,
+                validForWardrobe: containsFashionItem 
+            });
         }
 
+        // Step 4: Save to UploadedLooks
         const newLook = new UploadedLooks({
             userId: user._id,
             imageUrl,
-            title: generatedTitle || "Your Uploaded Look" // fallback title
+            title: generatedTitle || "Your Uploaded Look"
         });
 
         await newLook.save();
-        return res.status(201).json({ message: "Look uploaded successfully", data: newLook, validForWardrobe: containsFashionItem });
+
+        // Step 5: If it's a valid fashion item, silently add to wardrobe
+        if (containsFashionItem) {
+            await processWardrobeImages(user._id, [{
+                path: imageFile.path,
+                mimetype: imageFile.mimetype,
+                filename: imageFile.originalname
+            }]);
+        } else {
+            // clean up local file if not added to wardrobe
+            await fs.unlink(imageFile.path).catch(() => {});
+        }
+
+        return res.status(201).json({ 
+            message: "Look uploaded successfully", 
+            data: newLook, 
+            validForWardrobe: containsFashionItem 
+        });
+
     } catch (error) {
         console.error("Error adding uploaded look:", error);
         return res.status(500).json({ message: "Server error" });
     }
 };
+
 
 // get all uploaded looks
 export const getUploadedLooks = async (req, res) => {
