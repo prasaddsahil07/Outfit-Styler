@@ -21,20 +21,29 @@ async function fetchImageAsBase64(url) {
 }
 
 export async function analyzeImage(imageUrl) {
-    const prompt = `You're a fashion AI. 
-Given an image, identify:
+    const prompt = `You are a professional fashion AI analyst. Analyze this image carefully and provide the following information:
 
-1. Does it contain any clothing, footwear, or accessories?
-2. Does it contain a full-body human?
-3. If yes to full-body, generate a fashion-style title/caption for the look.
+ANALYSIS CRITERIA:
+1. Fashion Items: Look for any clothing, footwear, accessories, or fashion-related items (including bags, jewelry, hats, etc.)
+2. Full-Body Human: Determine if there's a complete human figure visible from head to toe (or head to feet if wearing shoes)
+3. Fashion Title: If a full-body human is present, create an engaging, descriptive fashion title that captures the overall style, aesthetic, and key elements of the outfit
 
-Respond in JSON like:
+RESPONSE FORMAT:
+Respond only in valid JSON format with these exact keys:
 {
+    "containsFashionItem": boolean,
+    "containsFullBodyHuman": boolean,
+    "generatedTitle": string or null
+}
 
-  "containsFashionItem": true/false,
-  "containsFullBodyHuman": true/false,
-  "generatedTitle": "..." // only if full-body
-}`;
+GUIDELINES:
+- Set "containsFashionItem" to true if ANY fashion-related item is visible
+- Set "containsFullBodyHuman" to true only if you can see a person's complete silhouette from head to feet
+- Only provide "generatedTitle" if "containsFullBodyHuman" is true
+- If no full-body human, set "generatedTitle" to null
+- Fashion titles should be creative, descriptive, and capture the mood/style (e.g., "Effortless Chic: Minimalist Elegance in Neutral Tones")
+
+Analyze the image now:`;
 
     const parts = [
         { text: prompt },
@@ -48,9 +57,13 @@ Respond in JSON like:
 
     const contents = createUserContent(parts);
     const result = await ai.models.generateContent({
-        model: 'gemini-2.0-pro',
+        model: 'gemini-2.0-flash-thinking-exp',
         contents: [contents],
-        config: { temperature: 0.3 }
+        config: {
+            temperature: 0.1,
+            topP: 0.8,
+            topK: 40,
+        },
     });
 
     const response = JSON.parse(result.candidates[0].content.parts[0].text);

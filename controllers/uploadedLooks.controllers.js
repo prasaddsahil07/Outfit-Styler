@@ -16,12 +16,12 @@ export const addUploadedLook = async (req, res) => {
             return res.status(500).json({ message: "Error uploading image to Cloudinary" });
         }
         const validationResult = await validateChatbotImage(imageUrl);
-        const { containsFullBodyHuman, generatedTitle } = validationResult;
+        const { containsFullBodyHuman, generatedTitle, containsFashionItem } = validationResult;
 
         if (!containsFullBodyHuman) {
             console.log("Image does not contain a full-body human, skipping upload");
             await deleteFromCloudinary(imageUrl); // clean up
-            return res.status(204).end();
+            return res.status(204).json({ message: "Does not contain a human body", data: null, validForWardrobe: containsFashionItem });
         }
 
         const newLook = new UploadedLooks({
@@ -31,7 +31,7 @@ export const addUploadedLook = async (req, res) => {
         });
 
         await newLook.save();
-        return res.status(201).json({ message: "Look uploaded successfully", data: newLook });
+        return res.status(201).json({ message: "Look uploaded successfully", data: newLook, validForWardrobe: containsFashionItem });
     } catch (error) {
         console.error("Error adding uploaded look:", error);
         return res.status(500).json({ message: "Server error" });
@@ -49,6 +49,22 @@ export const getUploadedLooks = async (req, res) => {
     } catch (error) {
         console.error('Error fetching looks:', error);
         res.status(500).json({ message: 'Failed to fetch looks', error: error.message });
+    }
+};
+
+// get a look by id
+export const getLookById = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { lookId } = req.params;
+        const look = await UploadedLooks.findOne({ _id: lookId, userId });
+        if (!look) {
+            return res.status(404).json({ message: 'Look not found or not authorized to access.' });
+        }
+        res.status(200).json({ look });
+    } catch (error) {
+        console.error('Error fetching look:', error);
+        res.status(500).json({ message: 'Failed to fetch look', error: error.message });
     }
 };
 
