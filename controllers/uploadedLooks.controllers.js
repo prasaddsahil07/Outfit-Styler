@@ -7,7 +7,7 @@ import { addToWardrobe } from "../services/addToWardrobe.js";
 export const addUploadedLook = async (req, res) => {
     const user = req.user;
     const imageFile = req.file;
-    const userQuery = req.query || '';
+    const { userQuery = '' } = req.query || {};
 
     if (!user || !imageFile) {
         return res.status(400).json({ message: "User or image file is missing" });
@@ -28,7 +28,7 @@ export const addUploadedLook = async (req, res) => {
         if (!containsFullBodyHuman) {
             console.log("Image does not contain a full-body human, skipping uploaded look");
             await deleteFromCloudinary(imageUrl); // cleanup
-            return res.status(204).json({ 
+            return res.status(204).json({
                 message: "Image skipped: no full-body human",
                 data: null
             });
@@ -52,11 +52,11 @@ export const addUploadedLook = async (req, res) => {
             }]);
         } else {
             // clean up local file if not added to wardrobe
-            await fs.unlink(imageFile.path).catch(() => {});
+            await fs.unlink(imageFile.path).catch(() => { });
         }
 
-        return res.status(201).json({ 
-            message: "Look uploaded successfully", 
+        return res.status(201).json({
+            message: "Look uploaded successfully",
             data: newLook
         });
 
