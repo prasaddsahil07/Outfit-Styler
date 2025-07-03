@@ -1,21 +1,27 @@
 import { UploadedLooks } from "../models/uploadedLooks.models.js";
 import { validateChatbotImage } from "../services/validateChatbotImages.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
-import { addToWardrobe } from "../services/addToWardrobe.js";
+import { addToWardrobeFromUrl } from "../services/addToWardrobe.js";
+import fs from 'fs/promises';
 
 // add to uploaded looks
 export const addUploadedLook = async (req, res) => {
     const user = req.user;
     const imageFile = req.file;
-    const { userQuery = '' } = req.query || {};
+    const { userQuery = '' } = req.body || {};
 
     if (!user || !imageFile) {
         return res.status(400).json({ message: "User or image file is missing" });
     }
 
+    let imageUrl = null;
+
     try {
+        // Read the image buffer once for all operations
+        const imageBuffer = await fs.readFile(imageFile.path);
+
         // Step 1: Upload to Cloudinary
-        const imageUrl = await uploadOnCloudinary(imageFile.path);
+        imageUrl = await uploadOnCloudinary(imageFile.path);
         if (!imageUrl) {
             return res.status(500).json({ message: "Error uploading image to Cloudinary" });
         }
@@ -27,7 +33,9 @@ export const addUploadedLook = async (req, res) => {
         // Step 3: If not a full-body human, skip uploaded look
         if (!containsFullBodyHuman) {
             console.log("Image does not contain a full-body human, skipping uploaded look");
-            await deleteFromCloudinary(imageUrl); // cleanup
+            await deleteFromCloudinary(imageUrl); // cleanup Cloudinary since we won't save to DB
+            await deleteLocalFile(imageFile.path); // cleanup local file
+            
             return res.status(204).json({
                 message: "Image skipped: no full-body human",
                 data: null
@@ -43,17 +51,24 @@ export const addUploadedLook = async (req, res) => {
 
         await newLook.save();
 
-        // Step 5: If it's a valid fashion item, silently add to wardrobe
+        // Step 5: If it's a valid fashion item, add to wardrobe using URL and buffer
         if (containsFashionItem) {
-            await addToWardrobe(user._id, [{
-                path: imageFile.path,
-                mimetype: imageFile.mimetype,
-                filename: imageFile.originalname
-            }]);
-        } else {
-            // clean up local file if not added to wardrobe
-            await fs.unlink(imageFile.path).catch(() => { });
+            try {
+                await addToWardrobeFromUrl(
+                    user._id, 
+                    imageUrl, 
+                    imageBuffer, 
+                    imageFile.originalname
+                );
+                console.log("Successfully added to wardrobe");
+            } catch (error) {
+                console.error("Error adding to wardrobe:", error);
+                // Continue even if wardrobe addition fails
+            }
         }
+
+        // Clean up local file immediately after all operations
+        // await deleteLocalFile(imageFile.path);
 
         return res.status(201).json({
             message: "Look uploaded successfully",
@@ -62,6 +77,23 @@ export const addUploadedLook = async (req, res) => {
 
     } catch (error) {
         console.error("Error adding uploaded look:", error);
+        
+        // Cleanup on error
+        if (imageUrl) {
+            try {
+                await deleteFromCloudinary(imageUrl);
+            } catch (cleanupError) {
+                console.error("Error cleaning up Cloudinary image:", cleanupError);
+            }
+        }
+        
+        // Always try to cleanup local file on error
+        // try {
+        //     await deleteLocalFile(imageFile.path);
+        // } catch (cleanupError) {
+        //     console.log("File cleanup error (file may already be deleted):", cleanupError);
+        // }
+        
         return res.status(500).json({ message: "Server error" });
     }
 };
