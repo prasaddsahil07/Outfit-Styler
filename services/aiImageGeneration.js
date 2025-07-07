@@ -13,7 +13,7 @@ export const generateAIFashionSuggestions = async (occasion, numberOfImages = 3,
 
         // Build height description for the prompt
         const heightDescription = `${userHeight.feet}'${userHeight.inches}"`;
-        
+
         // Build body shape styling guidelines
         const getBodyShapeGuidelines = (bodyShape) => {
             const guidelines = {
@@ -64,7 +64,7 @@ ${userUnderTone ? `- Skin Undertone: ${userUnderTone} - ${getUndertoneColorGuide
 `;
 
         const aiPrompt = `
-ROLE: You are a professional fashion stylist creating complete, full-body styled outfits for a personalized fashion editorial campaign.
+ROLE: You are a professional fashion stylist creating complete, full-body styled outfits for a personalized fashion editorial campaign, with expertise in both contemporary and traditional Indian ethnic wear.
 
 OBJECTIVE:
 Design ${numberOfImages} distinct cohesive outfits perfect for a **${occasion}** setting, specifically tailored for the user's body characteristics. Create complete looks styled on a model that represents the user's physical attributes.
@@ -72,11 +72,28 @@ ${descriptionSection}
 ${personalizationSection}
 
 ✅ OUTFIT STRUCTURE (for each look):
+${occasion && (occasion.toLowerCase().includes('festival') || occasion.toLowerCase().includes('wedding') || occasion.toLowerCase().includes('diwali') || occasion.toLowerCase().includes('holi') || occasion.toLowerCase().includes('navratri') || occasion.toLowerCase().includes('durga puja') || occasion.toLowerCase().includes('karva chauth') || occasion.toLowerCase().includes('indian') || occasion.toLowerCase().includes('ethnic') || occasion.toLowerCase().includes('traditional')) ? `
+**For Indian Festive/Traditional Occasions:**
+- Include EXACTLY ONE complete ethnic outfit with:
+  - One main garment: Saree with blouse, Lehenga choli, Anarkali suit, Sharara set, Palazzo suit, Indo-western fusion wear, or Churidar kurta set
+  - Traditional footwear: Juttis, kolhapuris, wedges, or embellished heels
+  - 2–4 traditional accessories: Statement jewelry (necklace, earrings, bangles), potli bag/clutch, dupatta (if applicable), maang tikka, nose ring, or traditional hair accessories
+  - Optional: Traditional makeup elements like bindi, kajal, or mehendi patterns
+
+**Ethnic Wear Styling Guidelines:**
+- Focus on rich fabrics: silk, brocade, chiffon, georgette, velvet, or cotton with traditional prints
+- Incorporate traditional Indian colors: deep jewel tones, metallics, vibrant festival colors, or elegant pastels
+- Include authentic Indian embellishments: zardozi, mirror work, thread embroidery, sequins, or block prints
+- Ensure proper draping and fit for traditional garments
+- Balance traditional elements with contemporary styling where appropriate
+` : `
+**For Contemporary/Western Occasions:**
 - Include EXACTLY ONE complete outfit with:
   - One topwear (shirt, blouse, t-shirt, sweater, etc.)
   - One bottomwear (pants, skirt, shorts, etc.) OR a dress (if dress, no separate top/bottom needed)
   - One pair of shoes
   - 2–3 accessories (bag, hat, jewelry, belt, scarf – choose what fits the occasion)
+`}
 
 🎨 STYLING FOCUS:
 - Each outfit must be appropriate and stylish for **${occasion}**
@@ -91,25 +108,50 @@ ${description && description.trim() ? `- Reflect the styling preferences: "${des
 ${modelAppearanceSection}
 
 🖼️ VISUAL OUTPUT FORMAT:
+- **FULL-SIZE, HIGH-RESOLUTION IMAGES** - Generate complete, detailed fashion editorial images
 - Each outfit styled on the personalized photorealistic human model
-- Professional editorial photography look – full-body model shots
-- Clean and neutral background, natural light or soft studio lighting
-- High-resolution fashion-forward appearance
-- Show each complete outfit clearly and attractively
-- Model should consistently represent the user's physical characteristics
+- **FULL-BODY MODEL SHOTS** - Show entire outfit from head to toe clearly
+- Professional editorial photography look with studio-quality lighting
+- Clean and neutral background (white, cream, or subtle gradient)
+- Model should be positioned to showcase the complete outfit effectively
+- **IMAGE DIMENSIONS**: Generate wide, full-resolution images that capture all styling details
+- Model should consistently represent the user's physical characteristics across all images
+- Show fabric textures, embellishments, and styling details clearly
 ${description && description.trim() ? `- Ensure the overall visual aesthetic aligns with: "${description.trim()}"` : ''}
+
+${occasion && (occasion.toLowerCase().includes('festival') || occasion.toLowerCase().includes('wedding') || occasion.toLowerCase().includes('diwali') || occasion.toLowerCase().includes('holi') || occasion.toLowerCase().includes('navratri') || occasion.toLowerCase().includes('durga puja') || occasion.toLowerCase().includes('karva chauth') || occasion.toLowerCase().includes('indian') || occasion.toLowerCase().includes('ethnic') || occasion.toLowerCase().includes('traditional')) ? `
+**Additional Visual Requirements for Indian Ethnic Wear:**
+- Showcase traditional draping techniques (saree pleats, dupatta styling)
+- Highlight intricate embroidery, embellishments, and fabric details
+- Include traditional jewelry styling and placement
+- Show authentic color combinations and pattern mixing
+- Capture the elegance and richness of Indian traditional wear
+- Ensure cultural authenticity and respectful representation
+` : ''}
 
 🚫 ABSOLUTE RULES:
 - Generate exactly ${numberOfImages} distinct outfit looks
+- **MANDATORY**: All images must be FULL-SIZE and HIGH-RESOLUTION
 - No styling alternatives within each look
 - No text overlays or descriptions on images
 - Focus on showcasing realistic, wearable outfits
 - Model must consistently reflect the specified physical characteristics
 - All outfit choices must be flattering for the specified body type and coloring
+- **Ensure complete outfit visibility** - no cropping of important styling elements
 ${description && description.trim() ? `- All outfits should harmonize with the user's style direction while being distinctly different from each other` : ''}
+${occasion && (occasion.toLowerCase().includes('festival') || occasion.toLowerCase().includes('wedding') || occasion.toLowerCase().includes('diwali') || occasion.toLowerCase().includes('holi') || occasion.toLowerCase().includes('navratri') || occasion.toLowerCase().includes('durga puja') || occasion.toLowerCase().includes('karva chauth') || occasion.toLowerCase().includes('indian') || occasion.toLowerCase().includes('ethnic') || occasion.toLowerCase().includes('traditional')) ? `
+- Maintain cultural sensitivity and authenticity in ethnic wear representation
+- Ensure traditional garments are styled correctly and respectfully
+` : ''}
 
 ✨ GOAL:
-Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitable for the **${occasion}** setting, each styled professionally on a female model who represents the user's physical characteristics${userBodyShape ? ` (${userBodyShape} body shape)` : ''}${userUnderTone ? ` with ${userUnderTone} undertones` : ''} at ${heightDescription} height${description && description.trim() ? `, with styling that reflects: "${description.trim()}"` : ''}.
+Deliver ${numberOfImages} distinct and editorial-quality complete outfits suitable for the **${occasion}** setting, each styled professionally on a female model who represents the user's physical characteristics${userBodyShape ? ` (${userBodyShape} body shape)` : ''}${userUnderTone ? ` with ${userUnderTone} undertones` : ''} at ${heightDescription} height${description && description.trim() ? `, with styling that reflects: "${description.trim()}"` : ''}. 
+
+${occasion && (occasion.toLowerCase().includes('festival') || occasion.toLowerCase().includes('wedding') || occasion.toLowerCase().includes('diwali') || occasion.toLowerCase().includes('holi') || occasion.toLowerCase().includes('navratri') || occasion.toLowerCase().includes('durga puja') || occasion.toLowerCase().includes('karva chauth') || occasion.toLowerCase().includes('indian') || occasion.toLowerCase().includes('ethnic') || occasion.toLowerCase().includes('traditional')) ? `
+**Special Focus**: Create authentic, beautiful Indian ethnic wear looks that celebrate traditional craftsmanship while ensuring modern styling sensibilities and perfect fit for the user's body type.
+` : ''}
+
+**IMAGE QUALITY MANDATE**: All generated images must be full-resolution, professional-quality fashion editorial photographs that showcase every styling detail clearly and beautifully.
 `;
 
         const aiResponse = await ai.models.generateContent({
