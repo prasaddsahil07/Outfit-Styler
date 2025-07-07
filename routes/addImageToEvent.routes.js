@@ -5,8 +5,8 @@ import { verifyJWT } from '../middleware/auth.middleware.js';
 const router = Router();
 
 // for single day event
-router.post("/addImageToEvent/eventId", verifyJWT, addStyledImageToEvent);
+router.post("/addImageToEvent/:eventId", verifyJWT, addStyledImageToEvent);
 // for multi day event
-router.post("/addImageToEvent/eventId/dayEventId", verifyJWT, addStyledImageToEvent);
+router.post("/addImageToEvent/:eventId/:dayEventId", verifyJWT, addStyledImageToEvent);
 
 export default router;

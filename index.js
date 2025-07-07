@@ -22,6 +22,7 @@ import magazineRoute from "./routes/zuriMagazine.routes.js";
 import stylingRoute from "./routes/generateImages.routes.js";
 import styleRecommenderRoute from "./routes/styleRecommender.routes.js";
 import addImageToEventRoute from "./routes/addImageToEvent.routes.js";
+import wishListRoute from "./routes/wishList.routes.js";
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use("/api/magazine", magazineRoute);
 app.use("/api/styleRecommender", styleRecommenderRoute);
 app.use("/api/styling", stylingRoute);
 app.use("/api/imageToEvent", addImageToEventRoute);
+app.use("/api/wishList", wishListRoute);
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "landing.html"));
