@@ -55,10 +55,10 @@ const dayEventSchema = new mongoose.Schema({
         default: () => ({})
     },
     // Day-specific styling/images if needed
-    daySpecificImage: {
+    daySpecificImage: [{
         type: String,
         trim: true
-    }
+    }]
 }, { 
     _id: true, // Keep _id for individual day events
     timestamps: false 

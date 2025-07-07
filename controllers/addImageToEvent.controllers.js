@@ -5,7 +5,7 @@ export const addStyledImageToEvent = async (req, res) => {
     const userId = req.user._id;
     const { eventId, dayEventId } = req.params;
 
-    const styledImageData = req.body.styledImageUrls; // can be string or array
+    const styledImageData = req.body.styledImageUrls;
 
     if (
       !styledImageData ||
@@ -21,7 +21,7 @@ export const addStyledImageToEvent = async (req, res) => {
     let event;
 
     if (dayEventId) {
-      // Multi-day event: update specific day
+      // Multi-day event: push images to daySpecificImage array
       event = await Event.findOneAndUpdate(
         {
           _id: eventId,
@@ -29,9 +29,9 @@ export const addStyledImageToEvent = async (req, res) => {
           "daySpecificData._id": dayEventId,
         },
         {
-          $set: {
-            "daySpecificData.$.daySpecificImage": styledImageUrls[0], // assuming only 1 image for now
-            isStyled: true,
+          $set: { isStyled: true },
+          $push: {
+            "daySpecificData.$.daySpecificImage": { $each: styledImageUrls },
           },
         },
         { new: true, runValidators: true }
