@@ -6,7 +6,7 @@ import job from "./cron.js";
 import path from "path";
 
 import { connectDB } from "./db/connectDB.js";
-import OpenAI from "openai";
+// import OpenAI from "openai";
 import cors from "cors";
 
 import eventRoute from "./routes/events.routes.js";
@@ -29,7 +29,7 @@ dotenv.config();
 await connectDB();
 
 export const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 job.start();
 
