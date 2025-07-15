@@ -47,7 +47,7 @@ export const addArticle = async (req, res) => {
       bannerImage,
       tags: parsedTags
     });
-
+    // console.log("Added a new article");
     return res.status(201).json({ msg: "Article created successfully", data: newArticle });
   } catch (error) {
     console.error("Error adding article:", error);

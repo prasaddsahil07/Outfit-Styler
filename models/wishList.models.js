@@ -34,7 +34,7 @@ const wishlistSchema = new mongoose.Schema({
         type: Number
     },
     productUrl: {
-        type: Number
+        type: String
     }
 }, {timestamps: true});
 

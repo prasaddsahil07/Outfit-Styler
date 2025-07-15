@@ -24,9 +24,8 @@ export const toggleWishlistItem = async (req, res) => {
     if (!productId || !productTitle || !price || !platform) {
       return res.status(400).json({ msg: 'Missing required product fields' });
     }
-
-    // Check if the item already exists
-    const existingItem = await Wishlist.findOne({ userId, productId });
+    
+    const existingItem = await Wishlist.findOne({ userId, _id });
 
     if (existingItem) {
       // If exists, remove it
