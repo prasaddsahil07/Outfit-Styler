@@ -51,7 +51,7 @@ export const styleRecommenderController = async (req, res) => {
         // Generate content for all cases
         modelImage = await generateModelImage(imageUrls, occasion, badItemImages, description, req);
         results.push(modelImage || null);
-        aiGeneratedImageResponse = await generateAIFashionSuggestions(occasion, aiImageCount, description, req);
+        aiGeneratedImageResponse = await generateAIFashionSuggestions(imageUrls, occasion, aiImageCount, description, req);
         results.push(aiGeneratedImageResponse?.imageB64 || null);
 
         // Analyze generated images and bad images with AI
